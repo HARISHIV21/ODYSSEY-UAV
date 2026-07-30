@@ -1,0 +1,1347 @@
+======================================================
+FILE: ./ODYSSEY_PROJECT_CODE.txt
+======================================================
+
+======================================================
+FILE: ./test_mission.py
+======================================================
+import sys
+
+sys.path.extend([
+    "Navigation"
+])
+
+from mission_loader import MissionLoader
+from mission_planner import MissionPlanner
+
+
+loader = MissionLoader("Data/Missions/mission.json")
+
+mission = loader.load()
+
+planner = MissionPlanner()
+
+planner.load(mission)
+
+planner.show()
+
+======================================================
+FILE: ./Data/Missions/mission.json
+======================================================
+{
+    "mission_name": "Demo Mission",
+    "takeoff_altitude": 20,
+    "waypoints": [
+        {
+            "x": 10,
+            "y": 5,
+            "z": 10
+        },
+        {
+            "x": 25,
+            "y": 10,
+            "z": 15
+        },
+        {
+            "x": 40,
+            "y": 15,
+            "z": 20
+        }
+    ],
+    "landing": true
+}
+
+======================================================
+FILE: ./Data/mission.json
+======================================================
+{
+    "mission_name": "Square Flight",
+
+    "takeoff_altitude": 10,
+
+    "waypoints": [
+
+        {
+            "north": 5,
+            "east": 0,
+            "down": -10,
+            "yaw": 0
+        },
+
+        {
+            "north": 5,
+            "east": 5,
+            "down": -10,
+            "yaw": 90
+        },
+
+        {
+            "north": 0,
+            "east": 5,
+            "down": -10,
+            "yaw": 180
+        },
+
+        {
+            "north": 0,
+            "east": 0,
+            "down": -10,
+            "yaw": 270
+        }
+
+    ]
+}
+
+======================================================
+FILE: ./app.py
+======================================================
+import asyncio
+
+from MissionComputer.flight_manager import FlightManager
+from Navigation.mission_loader import MissionLoader
+
+
+async def main():
+
+    loader = MissionLoader("Data/mission.json")
+    mission = loader.load()
+
+    fm = FlightManager()
+
+    await fm.connect()
+    await fm.wait_until_ready()
+
+    await fm.arm()
+
+    await fm.takeoff(
+        mission["takeoff_altitude"]
+    )
+
+    telemetry_task = asyncio.create_task(
+        fm.telemetry.monitor()
+    )
+
+    print("\n==============================")
+    print("MISSION STARTED")
+    print("==============================\n")
+
+    # Allow takeoff to stabilize before Offboard starts.
+    await asyncio.sleep(10)
+
+    await fm.offboard.start(
+        mission["takeoff_altitude"]
+    )
+
+    total = len(mission["waypoints"])
+
+    for index, wp in enumerate(
+        mission["waypoints"],
+        start=1
+    ):
+
+        print(f"\n[MISSION] Waypoint {index}/{total}")
+
+        await fm.offboard.goto(
+            wp["north"],
+            wp["east"],
+            wp["down"],
+            wp["yaw"]
+        )
+
+    await fm.offboard.stop()
+
+    await fm.land()
+
+    telemetry_task.cancel()
+
+    print("\n==============================")
+    print("MISSION COMPLETE")
+    print("==============================\n")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+======================================================
+FILE: ./offboard_controller.py
+======================================================
+import asyncio
+from mavsdk.offboard import PositionNedYaw, OffboardError
+
+
+class OffboardController:
+
+    def __init__(self, drone):
+        self.drone = drone
+
+    async def start(self, altitude=10.0):
+
+        print("[OFFBOARD] Initializing...")
+
+        # Send an initial setpoint at the desired altitude.
+        # In NED coordinates, Down is negative above the home position.
+        await self.drone.offboard.set_position_ned(
+            PositionNedYaw(
+                north_m=0.0,
+                east_m=0.0,
+                down_m=-altitude,
+                yaw_deg=0.0
+            )
+        )
+
+        await asyncio.sleep(0.2)
+
+        try:
+            await self.drone.offboard.start()
+            print("[OFFBOARD] Started")
+
+        except OffboardError as error:
+            print(f"[OFFBOARD] Failed: {error}")
+            raise
+
+    async def goto(
+        self,
+        north,
+        east,
+        down,
+        yaw=0.0,
+        hold_time=5
+    ):
+
+        print(
+            f"[OFFBOARD] Going to "
+            f"N={north:.1f} "
+            f"E={east:.1f} "
+            f"D={down:.1f}"
+        )
+
+        await self.drone.offboard.set_position_ned(
+            PositionNedYaw(
+                north_m=north,
+                east_m=east,
+                down_m=down,
+                yaw_deg=yaw
+            )
+        )
+
+        await asyncio.sleep(hold_time)
+
+    async def stop(self):
+
+        print("[OFFBOARD] Stopping")
+
+        try:
+            await self.drone.offboard.stop()
+
+        except OffboardError:
+            pass
+
+======================================================
+FILE: ./Documentation/ARCHITECTURE.md
+======================================================
+
+======================================================
+FILE: ./Documentation/USER_GUIDE.md
+======================================================
+
+======================================================
+FILE: ./Documentation/INSTALL.md
+======================================================
+
+======================================================
+FILE: ./Documentation/API.md
+======================================================
+
+======================================================
+FILE: ./Utils/logger.py
+======================================================
+from datetime import datetime
+
+def log(message):
+
+    time = datetime.now().strftime("%H:%M:%S")
+
+    print(f"[{time}] {message}")
+
+======================================================
+FILE: ./Core/core.py
+======================================================
+from enum import Enum
+
+
+class UAVState(Enum):
+    IDLE = 0
+    INITIALIZING = 1
+    CONNECTED = 2
+    ARMED = 3
+    TAKEOFF = 4
+    MISSION = 5
+    RTL = 6
+    LANDING = 7
+    COMPLETE = 8
+
+
+class MissionCore:
+
+    def __init__(self):
+        self.state = UAVState.IDLE
+
+    def change_state(self, state):
+        print(f"[CORE] {self.state.name} -> {state.name}")
+        self.state = state
+
+    def initialize(self):
+        self.change_state(UAVState.INITIALIZING)
+
+    def connect(self):
+        self.change_state(UAVState.CONNECTED)
+
+    def arm(self):
+        self.change_state(UAVState.ARMED)
+
+    def takeoff(self):
+        self.change_state(UAVState.TAKEOFF)
+
+    def mission(self):
+        self.change_state(UAVState.MISSION)
+
+    def rtl(self):
+        self.change_state(UAVState.RTL)
+
+    def land(self):
+        self.change_state(UAVState.LANDING)
+
+    def finish(self):
+        self.change_state(UAVState.COMPLETE)
+
+
+if __name__ == "__main__":
+    core = MissionCore()
+
+    core.initialize()
+    core.connect()
+    core.arm()
+    core.takeoff()
+    core.mission()
+    core.rtl()
+    core.land()
+    core.finish()
+
+======================================================
+FILE: ./Core/failsafe.py
+======================================================
+class Failsafe:
+
+    def __init__(self):
+        self.low_battery = False
+        self.gps_lost = False
+        self.communication_lost = False
+
+    def check(self):
+
+        if self.low_battery:
+            print("[FAILSAFE] Low Battery")
+
+        if self.gps_lost:
+            print("[FAILSAFE] GPS Lost")
+
+        if self.communication_lost:
+            print("[FAILSAFE] Communication Lost")
+
+
+if __name__ == "__main__":
+
+    fs = Failsafe()
+
+    fs.low_battery = True
+
+    fs.check()
+
+======================================================
+FILE: ./Core/logger.py
+======================================================
+from datetime import datetime
+from pathlib import Path
+
+
+class MissionLogger:
+
+    def __init__(self):
+        Path("../Logs").mkdir(exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        self.file = open(
+            f"../Logs/mission_{timestamp}.log",
+            "w"
+        )
+
+    def log(self, message):
+
+        line = (
+            f"[{datetime.now().strftime('%H:%M:%S')}] "
+            f"{message}"
+        )
+
+        print(line)
+
+        self.file.write(line + "\n")
+        self.file.flush()
+
+    def close(self):
+        self.file.close()
+
+======================================================
+FILE: ./Telemetry/telemetry.py
+======================================================
+import time
+
+class Telemetry:
+
+    def __init__(self):
+        self.altitude = 0
+        self.speed = 0
+        self.battery = 100
+
+    def update(self):
+        self.altitude += 2
+        self.speed = 5
+        self.battery -= 1
+
+    def display(self):
+        print("----------------------------")
+        print(f"Altitude : {self.altitude} m")
+        print(f"Speed    : {self.speed} m/s")
+        print(f"Battery  : {self.battery}%")
+        print("----------------------------")
+
+
+if __name__ == "__main__":
+
+    telemetry = Telemetry()
+
+    for i in range(5):
+        telemetry.update()
+        telemetry.display()
+        time.sleep(1)
+
+======================================================
+FILE: ./Control/flight_modes.py
+======================================================
+from enum import Enum
+
+
+class FlightMode(Enum):
+    MANUAL = 0
+    STABILIZED = 1
+    ALTITUDE = 2
+    POSITION = 3
+    OFFBOARD = 4
+    AUTO_MISSION = 5
+    RTL = 6
+    LAND = 7
+
+
+class FlightModeManager:
+
+    def __init__(self):
+        self.mode = FlightMode.MANUAL
+
+    def set_mode(self, mode):
+        print(f"[MODE] {self.mode.name} -> {mode.name}")
+        self.mode = mode
+
+
+if __name__ == "__main__":
+
+    manager = FlightModeManager()
+
+    manager.set_mode(FlightMode.STABILIZED)
+    manager.set_mode(FlightMode.POSITION)
+    manager.set_mode(FlightMode.OFFBOARD)
+    manager.set_mode(FlightMode.AUTO_MISSION)
+    manager.set_mode(FlightMode.RTL)
+    manager.set_mode(FlightMode.LAND)
+
+======================================================
+FILE: ./Control/controller.py
+======================================================
+class FlightController:
+    def __init__(self):
+        self.mode = "IDLE"
+
+    def arm(self):
+        self.mode = "ARMED"
+        print("[CTRL] UAV Armed")
+
+    def takeoff(self):
+        self.mode = "TAKEOFF"
+        print("[CTRL] UAV Taking Off")
+
+    def move_to(self, x, y, z):
+        print(f"[CTRL] Flying to ({x}, {y}, {z})")
+
+    def hover(self):
+        print("[CTRL] Hovering")
+
+    def land(self):
+        self.mode = "LANDING"
+        print("[CTRL] Landing")
+
+
+if __name__ == "__main__":
+    fc = FlightController()
+
+    fc.arm()
+    fc.takeoff()
+    fc.move_to(10, 5, 15)
+    fc.hover()
+    fc.land()
+
+======================================================
+FILE: ./Communication/land.py
+======================================================
+import asyncio
+from mavsdk import System
+
+
+async def main():
+    drone = System()
+
+    await drone.connect(system_address="udpin://0.0.0.0:14540")
+
+    async for state in drone.core.connection_state():
+        if state.is_connected:
+            break
+
+    print("Landing...")
+    await drone.action.land()
+
+    print("Land command sent")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+======================================================
+FILE: ./Communication/takeoff.py
+======================================================
+import asyncio
+from mavsdk import System
+
+
+async def main():
+    drone = System()
+
+    print("Connecting to PX4...")
+    await drone.connect(system_address="udpin://0.0.0.0:14540")
+
+    async for state in drone.core.connection_state():
+        if state.is_connected:
+            print("✅ Connected")
+            break
+
+    print("Waiting for vehicle health...")
+
+    async for health in drone.telemetry.health():
+        if health.is_global_position_ok and health.is_home_position_ok:
+            print("✅ Vehicle Ready")
+            break
+
+    print("Arming...")
+    await drone.action.arm()
+
+    print("Setting takeoff altitude...")
+    await drone.action.set_takeoff_altitude(10.0)
+
+    print("Taking off...")
+    await drone.action.takeoff()
+
+    print("Waiting 15 seconds...")
+
+    await asyncio.sleep(15)
+
+    print("Takeoff Complete")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+======================================================
+FILE: ./Communication/telemetry_stream.py
+======================================================
+import asyncio
+from mavsdk import System
+
+
+async def main():
+    drone = System()
+
+    print("Connecting...")
+
+    await drone.connect(system_address="udpin://0.0.0.0:14540")
+
+    async for state in drone.core.connection_state():
+        if state.is_connected:
+            print("Connected!")
+            break
+
+    print("Reading Telemetry...\n")
+
+    async for health in drone.telemetry.health():
+        print("GPS OK :", health.is_global_position_ok)
+        print("Home OK:", health.is_home_position_ok)
+        break
+
+    async for position in drone.telemetry.position():
+        print(f"Latitude : {position.latitude_deg:.6f}")
+        print(f"Longitude: {position.longitude_deg:.6f}")
+        print(f"Altitude : {position.relative_altitude_m:.2f}")
+        print("-"*40)
+        await asyncio.sleep(1)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+======================================================
+FILE: ./Communication/uav_connection.py
+======================================================
+import asyncio
+from mavsdk import System
+
+
+class UAVConnection:
+
+    def __init__(self):
+        self.drone = System()
+
+    async def connect(self):
+        print("[COMM] Connecting to PX4...")
+
+        await self.drone.connect(
+            system_address="udpin://0.0.0.0:14540"
+        )
+
+        async for state in self.drone.core.connection_state():
+
+            if state.is_connected:
+                print("[COMM] Connected to PX4")
+                break
+
+        return self.drone
+
+
+async def main():
+
+    connection = UAVConnection()
+
+    await connection.connect()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+======================================================
+FILE: ./Communication/arm.py
+======================================================
+import asyncio
+from mavsdk import System
+
+
+async def main():
+    drone = System()
+
+    print("Connecting to PX4...")
+
+    await drone.connect(system_address="udpin://0.0.0.0:14540")
+
+    async for state in drone.core.connection_state():
+        if state.is_connected:
+            print("✅ Connected")
+            break
+
+    print("Waiting for health...")
+
+    async for health in drone.telemetry.health():
+        if health.is_global_position_ok and health.is_home_position_ok:
+            print("✅ Drone Ready")
+            break
+
+    print("Arming...")
+
+    await drone.action.arm()
+
+    print("✅ Drone Armed")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+======================================================
+FILE: ./Navigation/navigation.py
+======================================================
+class Navigation:
+
+    def __init__(self):
+        self.current_position = (0.0, 0.0, 0.0)
+        self.target_position = None
+
+    def update_position(self, x, y, z):
+        self.current_position = (x, y, z)
+        print(f"[NAV] Current Position: {self.current_position}")
+
+    def set_target(self, x, y, z):
+        self.target_position = (x, y, z)
+        print(f"[NAV] Target Position: {self.target_position}")
+
+    def navigate(self):
+        if self.target_position:
+            print("[NAV] Navigating...")
+            print(f"[NAV] Flying to {self.target_position}")
+        else:
+            print("[NAV] No target available")
+
+
+if __name__ == "__main__":
+    nav = Navigation()
+
+    nav.update_position(0, 0, 0)
+    nav.set_target(20, 15, 10)
+    nav.navigate()
+
+======================================================
+FILE: ./Navigation/mission_loader.py
+======================================================
+import json
+
+
+class MissionLoader:
+
+    def __init__(self, filename):
+
+        self.filename = filename
+
+    def load(self):
+
+        with open(self.filename, "r") as file:
+
+            mission = json.load(file)
+
+        print()
+
+        print("Mission Loaded")
+
+        print("------------------------")
+
+        print("Mission :", mission["mission_name"])
+
+        print("Waypoints :", len(mission["waypoints"]))
+
+        print()
+
+        return mission
+
+======================================================
+FILE: ./Navigation/mission_planner.py
+======================================================
+class MissionPlanner:
+
+    def __init__(self):
+        self.waypoints = []
+
+    def load(self, mission):
+
+        self.waypoints.clear()
+
+        for wp in mission["waypoints"]:
+            self.waypoints.append(
+                (
+                    wp["x"],
+                    wp["y"],
+                    wp["z"]
+                )
+            )
+
+    def show(self):
+
+        print("\nMission Plan")
+
+        for i, wp in enumerate(self.waypoints):
+            print(f"{i+1}. {wp}")
+
+======================================================
+FILE: ./Navigation/__init__.py
+======================================================
+
+======================================================
+FILE: ./MissionComputer/state_machine.py
+======================================================
+from enum import Enum
+
+
+class MissionState(Enum):
+    IDLE = 0
+    INITIALIZING = 1
+    ARMED = 2
+    TAKEOFF = 3
+    NAVIGATION = 4
+    HOVER = 5
+    LANDING = 6
+    COMPLETE = 7
+
+
+class StateMachine:
+
+    def __init__(self):
+        self.state = MissionState.IDLE
+
+    def change_state(self, new_state):
+        print(f"[STATE] {self.state.name} --> {new_state.name}")
+        self.state = new_state
+
+
+if __name__ == "__main__":
+
+    sm = StateMachine()
+
+    sm.change_state(MissionState.INITIALIZING)
+    sm.change_state(MissionState.ARMED)
+    sm.change_state(MissionState.TAKEOFF)
+    sm.change_state(MissionState.NAVIGATION)
+    sm.change_state(MissionState.HOVER)
+    sm.change_state(MissionState.LANDING)
+    sm.change_state(MissionState.COMPLETE)
+
+======================================================
+FILE: ./MissionComputer/offboard_controller.py
+======================================================
+import asyncio
+from mavsdk.offboard import PositionNedYaw, OffboardError
+
+
+class OffboardController:
+
+    def __init__(self, drone):
+        self.drone = drone
+
+    async def start(self):
+
+        print("[OFFBOARD] Initializing...")
+
+        # Initial setpoint required before starting Offboard
+        await self.drone.offboard.set_position_ned(
+            PositionNedYaw(
+                north_m=0.0,
+                east_m=0.0,
+                down_m=0.0,
+                yaw_deg=0.0
+            )
+        )
+
+        try:
+            await self.drone.offboard.start()
+            print("[OFFBOARD] Started")
+
+        except OffboardError as error:
+            print(f"[OFFBOARD] Failed: {error}")
+            raise
+
+    async def goto(self, north, east, down, yaw=0.0, hold_time=5):
+
+        print(
+            f"[OFFBOARD] Going to "
+            f"N={north:.1f} "
+            f"E={east:.1f} "
+            f"D={down:.1f}"
+        )
+
+        await self.drone.offboard.set_position_ned(
+            PositionNedYaw(
+                north_m=north,
+                east_m=east,
+                down_m=down,
+                yaw_deg=yaw
+            )
+        )
+
+        await asyncio.sleep(hold_time)
+
+    async def stop(self):
+
+        print("[OFFBOARD] Stopping")
+
+        try:
+            await self.drone.offboard.stop()
+
+        except OffboardError:
+            pass
+
+======================================================
+FILE: ./MissionComputer/mission_computer.py
+======================================================
+import sys
+import os
+
+sys.path.append("../Navigation")
+sys.path.append("../Control")
+sys.path.append("../Telemetry")
+sys.path.append("../Sensors")
+
+from navigation import Navigation
+from controller import FlightController
+from telemetry import Telemetry
+from imu import IMU
+
+
+class MissionComputer:
+
+    def __init__(self):
+
+        self.navigation = Navigation()
+        self.controller = FlightController()
+        self.telemetry = Telemetry()
+        self.imu = IMU()
+
+    def initialize(self):
+
+        print("===================================")
+        print("UAV Mission Computer Initializing")
+        print("===================================")
+
+    def execute(self):
+
+        self.controller.arm()
+        self.controller.takeoff()
+
+        self.navigation.update_position(0,0,0)
+        self.navigation.set_target(20,15,10)
+        self.navigation.navigate()
+
+        self.telemetry.update()
+        self.telemetry.display()
+
+        print(self.imu.read())
+
+        self.controller.hover()
+        self.controller.land()
+
+
+if __name__ == "__main__":
+
+    mission = MissionComputer()
+
+    mission.initialize()
+    mission.execute()
+
+======================================================
+FILE: ./MissionComputer/flight_manager.py
+======================================================
+import asyncio
+from mavsdk import System
+
+from MissionComputer.offboard_controller import OffboardController
+from MissionComputer.telemetry_manager import TelemetryManager
+
+
+class FlightManager:
+
+    def __init__(self):
+        self.drone = System()
+        self.offboard = OffboardController(self.drone)
+        self.telemetry = TelemetryManager(self.drone)
+
+    async def connect(self):
+
+        print("[MISSION] Connecting to PX4...")
+
+        await self.drone.connect(
+            system_address="udpin://0.0.0.0:14540"
+        )
+
+        async for state in self.drone.core.connection_state():
+            if state.is_connected:
+                print("[MISSION] Connected")
+                break
+
+    async def wait_until_ready(self):
+
+        print("[MISSION] Waiting for vehicle health...")
+
+        async for health in self.drone.telemetry.health():
+            if (
+                health.is_global_position_ok
+                and health.is_home_position_ok
+            ):
+                print("[MISSION] Vehicle Ready")
+                break
+
+    async def arm(self):
+        print("[MISSION] Arming...")
+        await self.drone.action.arm()
+        print("[MISSION] Armed")
+
+    async def takeoff(self, altitude=10.0):
+        print(f"[MISSION] Setting takeoff altitude to {altitude} m...")
+        await self.drone.action.set_takeoff_altitude(altitude)
+        print("[MISSION] Taking off...")
+        await self.drone.action.takeoff()
+    async def wait_until_altitude(self, target_altitude):
+
+        print(f"[MISSION] Waiting to reach {target_altitude:.1f} m...")
+
+        async for position in self.drone.telemetry.position():
+
+            altitude = position.relative_altitude_m
+
+            print(
+                f"[MISSION] Current Altitude: {altitude:.2f} m",
+                end="\r"
+            )
+
+            if altitude >= target_altitude - 0.5:
+
+                print()
+
+                print("[MISSION] Target altitude reached.")
+
+                break
+
+    async def land(self):
+        print("[MISSION] Landing...")
+        await self.drone.action.land()
+
+    async def rtl(self):
+        print("[MISSION] Returning to Launch...")
+        await self.drone.action.return_to_launch()
+
+    async def hold(self):
+        print("[MISSION] Hold Position...")
+        await self.drone.action.hold()
+
+======================================================
+FILE: ./MissionComputer/mission_executor.py
+======================================================
+import sys
+
+sys.path.append("../Navigation")
+sys.path.append("../Control")
+sys.path.append("../Sensors")
+
+from mission_planner import MissionPlanner
+from controller import FlightController
+from battery import Battery
+
+
+class MissionExecutor:
+
+    def __init__(self):
+
+        self.controller = FlightController()
+        self.planner = MissionPlanner()
+        self.battery = Battery()
+
+    def setup(self):
+
+        self.planner.add_waypoint(10, 5, 10)
+        self.planner.add_waypoint(20, 10, 15)
+        self.planner.add_waypoint(30, 15, 20)
+
+    def execute(self):
+
+        self.controller.arm()
+        self.controller.takeoff()
+
+        for waypoint in self.planner.waypoints:
+
+            self.battery.consume()
+            self.battery.check()
+
+            print(f"[MISSION] Flying to {waypoint}")
+
+            self.controller.move_to(*waypoint)
+
+        self.controller.land()
+
+
+if __name__ == "__main__":
+
+    mission = MissionExecutor()
+
+    mission.setup()
+
+    mission.execute()
+
+======================================================
+FILE: ./MissionComputer/telemetry_manager.py
+======================================================
+import asyncio
+
+
+class TelemetryManager:
+
+    def __init__(self, drone):
+        self.drone = drone
+
+    async def monitor(self):
+
+        async for position in self.drone.telemetry.position():
+
+            print("\n-----------------------------")
+
+            print(
+                f"LATITUDE  : {position.latitude_deg:.6f}"
+            )
+
+            print(
+                f"LONGITUDE : {position.longitude_deg:.6f}"
+            )
+
+            print(
+                f"ALTITUDE  : {position.relative_altitude_m:.2f} m"
+            )
+
+            print("-----------------------------")
+
+            await asyncio.sleep(1)
+
+======================================================
+FILE: ./MissionComputer/mission_manager.py
+======================================================
+class MissionManager:
+    def __init__(self):
+        self.state = "IDLE"
+
+    def initialize(self):
+        self.state = "READY"
+        print("[INFO] Mission Computer Initialized")
+
+    def arm(self):
+        self.state = "ARMED"
+        print("[INFO] UAV Armed")
+
+    def takeoff(self):
+        self.state = "TAKEOFF"
+        print("[INFO] UAV Taking Off")
+
+    def mission(self):
+        self.state = "MISSION"
+        print("[INFO] Executing Mission")
+
+    def land(self):
+        self.state = "LANDING"
+        print("[INFO] Landing")
+
+    def shutdown(self):
+        self.state = "OFF"
+        print("[INFO] Mission Complete")
+
+
+if __name__ == "__main__":
+    mc = MissionManager()
+
+    mc.initialize()
+    mc.arm()
+    mc.takeoff()
+    mc.mission()
+    mc.land()
+    mc.shutdown()
+
+======================================================
+FILE: ./MissionComputer/battery_monitor.py
+======================================================
+class BatteryMonitor:
+
+    def __init__(self, drone):
+        self.drone = drone
+
+    async def monitor(self):
+
+        async for battery in self.drone.telemetry.battery():
+
+            print(
+                f"[BATTERY] "
+                f"{battery.remaining_percent*100:.1f}%"
+            )
+
+======================================================
+FILE: ./MissionComputer/run_mission.py
+======================================================
+import asyncio
+from flight_manager import FlightManager
+
+
+async def main():
+
+    manager = FlightManager()
+
+    await manager.connect()
+
+    await manager.wait_until_ready()
+
+    await manager.arm()
+
+    await manager.takeoff()
+
+    print("Hovering for 10 seconds...")
+
+    await asyncio.sleep(10)
+
+    await manager.land()
+
+
+asyncio.run(main())
+
+======================================================
+FILE: ./MissionComputer/mission_runner.py
+======================================================
+import asyncio
+import json
+from flight_manager import FlightManager
+
+
+def load_mission(path):
+    with open(path, "r") as f:
+        return json.load(f)
+
+
+async def main():
+
+    mission = load_mission("../Data/Missions/mission.json")
+
+    fm = FlightManager()
+
+    await fm.connect()
+    await fm.wait_until_ready()
+
+    print("[MISSION] Arming...")
+    await fm.arm()
+
+    print("[MISSION] Taking off...")
+    await fm.takeoff()
+
+    print(f"[MISSION] Loaded mission: {mission['mission_name']}")
+
+    for i, wp in enumerate(mission["waypoints"], start=1):
+        print(
+            f"[MISSION] Waypoint {i}: "
+            f"({wp['x']}, {wp['y']}, {wp['z']})"
+        )
+
+        # Placeholder for actual navigation
+        await asyncio.sleep(5)
+
+    print("[MISSION] Landing...")
+    await fm.land()
+
+    print("[MISSION] Complete")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+
+======================================================
+FILE: ./MissionComputer/__init__.py
+======================================================
+
+======================================================
+FILE: ./README.md
+======================================================
+# Embedded Autonomous UAV Mission Computer
+
+## Overview
+
+A modular autonomous UAV software framework developed using Python and designed for PX4 SITL integration.
+
+## Features
+
+- Mission Computer
+- Navigation
+- Flight Controller
+- Flight Modes
+- Mission Planner
+- Telemetry
+- IMU Sensor
+- Battery Monitoring
+- State Machine
+- Failsafe Manager
+
+## Future Work
+
+- MAVSDK Integration
+- PX4 Offboard Control
+- Obstacle Avoidance
+- AI Vision
+- Precision Landing
+- Multi-UAV Support
+
+======================================================
+FILE: ./Sensors/battery.py
+======================================================
+class Battery:
+
+    def __init__(self):
+        self.level = 100
+
+    def consume(self):
+        self.level -= 5
+
+    def check(self):
+        print(f"[BATTERY] {self.level}%")
+
+        if self.level <= 20:
+            print("[BATTERY] WARNING - LOW BATTERY")
+
+
+if __name__ == "__main__":
+
+    battery = Battery()
+
+    for _ in range(18):
+        battery.consume()
+        battery.check()
+
+======================================================
+FILE: ./Sensors/imu.py
+======================================================
+import random
+
+class IMU:
+
+    def read(self):
+        return {
+            "roll": round(random.uniform(-5,5),2),
+            "pitch": round(random.uniform(-5,5),2),
+            "yaw": round(random.uniform(0,360),2)
+        }
+
+
+if __name__ == "__main__":
+
+    imu = IMU()
+
+    print(imu.read())
+
+======================================================
+FILE: ./requirements.txt
+======================================================
+mavsdk
+asyncio
+numpy
+opencv-python
+pymavlink
+matplotlib
+
+======================================================
+FILE: ./Config/config.py
+======================================================
+MISSION_ALTITUDE = 20
+MISSION_SPEED = 5
+HOME_POSITION = (0,0,0)
+
+MAX_BATTERY = 100
+LOW_BATTERY = 20
+
+SAFE_DISTANCE = 5
+

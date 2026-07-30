@@ -1,0 +1,37 @@
+{
+    "mission_name": "Square Flight",
+
+    "takeoff_altitude": 10,
+
+    "waypoints": [
+
+        {
+            "north": 5,
+            "east": 0,
+            "down": -10,
+            "yaw": 0
+        },
+
+        {
+            "north": 5,
+            "east": 5,
+            "down": -10,
+            "yaw": 90
+        },
+
+        {
+            "north": 0,
+            "east": 5,
+            "down": -10,
+            "yaw": 180
+        },
+
+        {
+            "north": 0,
+            "east": 0,
+            "down": -10,
+            "yaw": 270
+        }
+
+    ]
+}

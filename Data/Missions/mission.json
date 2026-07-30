@@ -1,0 +1,22 @@
+{
+    "mission_name": "Demo Mission",
+    "takeoff_altitude": 20,
+    "waypoints": [
+        {
+            "x": 10,
+            "y": 5,
+            "z": 10
+        },
+        {
+            "x": 25,
+            "y": 10,
+            "z": 15
+        },
+        {
+            "x": 40,
+            "y": 15,
+            "z": 20
+        }
+    ],
+    "landing": true
+}

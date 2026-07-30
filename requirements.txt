@@ -1,0 +1,6 @@
+mavsdk
+asyncio
+numpy
+opencv-python
+pymavlink
+matplotlib
