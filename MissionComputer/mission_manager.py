@@ -1,4 +1,6 @@
 from MissionComputer.state_machine import MissionState
+from Navigation.navigation_engine import NavigationEngine
+from Navigation.waypoint_tracker import WaypointTracker
 
 
 class MissionManager:
@@ -9,6 +11,17 @@ class MissionManager:
         self.mission = mission
         self.state_machine = None
 
+        # Navigation engine confirms real waypoint arrival
+        self.navigator = NavigationEngine(
+            self.fm.drone,
+            tolerance=1.0
+        )
+
+        # Tracks mission completion/progress
+        self.tracker = WaypointTracker(
+            mission
+        )
+
     def attach_state_machine(self, state_machine):
 
         self.state_machine = state_machine
@@ -17,37 +30,88 @@ class MissionManager:
 
         sm = self.state_machine
 
+        # -------------------------------------------------
+        # CONNECT
+        # -------------------------------------------------
+
         sm.set_state(MissionState.CONNECT)
         await self.fm.connect()
+
+        # -------------------------------------------------
+        # VEHICLE HEALTH
+        # -------------------------------------------------
 
         sm.set_state(MissionState.WAIT_FOR_HEALTH)
         await self.fm.wait_until_ready()
 
+        # -------------------------------------------------
+        # ARM
+        # -------------------------------------------------
+
         sm.set_state(MissionState.ARM)
         await self.fm.arm()
 
+        # -------------------------------------------------
+        # TAKEOFF
+        # -------------------------------------------------
+
         sm.set_state(MissionState.TAKEOFF)
+
         await self.fm.takeoff(
             self.mission["takeoff_altitude"]
         )
 
+        # -------------------------------------------------
+        # START OFFBOARD
+        # -------------------------------------------------
+
         sm.set_state(MissionState.START_OFFBOARD)
+
         await self.fm.offboard.start(
             self.mission["takeoff_altitude"]
         )
 
+        # -------------------------------------------------
+        # MISSION
+        # -------------------------------------------------
+
         sm.set_state(MissionState.MISSION)
 
-        waypoints = self.mission["waypoints"]
+        print("\n========== MISSION PROGRESS ==========")
+        print(
+            f"Completed : 0/{self.tracker.total()}"
+        )
+        print(
+            f"Remaining : {self.tracker.remaining()}"
+        )
+        print("Progress  : 0.0%")
+        print("======================================")
 
-        for index, wp in enumerate(waypoints, start=1):
+        # -------------------------------------------------
+        # WAYPOINT EXECUTION
+        # -------------------------------------------------
+
+        while self.tracker.has_next():
+
+            wp = self.tracker.current_waypoint()
+
+            waypoint_number = self.tracker.completed() + 1
 
             sm.set_state(MissionState.WAYPOINT)
 
             print(
-                f"\n[MISSION] Waypoint {index}/{len(waypoints)}"
+                f"\n[MISSION] Waypoint "
+                f"{waypoint_number}/{self.tracker.total()}"
             )
 
+            print(
+                f"[MISSION] Target -> "
+                f"N:{wp['north']} "
+                f"E:{wp['east']} "
+                f"D:{wp['down']}"
+            )
+
+            # Send waypoint to PX4 offboard controller
             await self.fm.offboard.goto(
                 wp["north"],
                 wp["east"],
@@ -55,21 +119,60 @@ class MissionManager:
                 wp.get("yaw", 0),
             )
 
+            # Confirm vehicle physically reached waypoint
+            await self.navigator.wait_until_arrived(
+                wp
+            )
+
+            # Waypoint completed
+            self.tracker.advance()
+
+            # Print progress
+            self.tracker.print_progress()
+
+        # -------------------------------------------------
+        # LAND
+        # -------------------------------------------------
+
         sm.set_state(MissionState.LAND)
 
         await self.fm.offboard.stop()
 
         await self.fm.land()
 
+        # -------------------------------------------------
+        # DISARM
+        # -------------------------------------------------
+
         sm.set_state(MissionState.DISARM)
 
         try:
+
             await self.fm.disarm()
+
         except Exception:
+
+            # PX4 may automatically disarm after landing
             pass
+
+        # -------------------------------------------------
+        # COMPLETE
+        # -------------------------------------------------
 
         sm.set_state(MissionState.COMPLETE)
 
         print("\n==============================")
         print("MISSION COMPLETE")
+        print("==============================")
+
+        print(
+            f"Waypoints Completed : "
+            f"{self.tracker.completed()}/{self.tracker.total()}"
+        )
+
+        print(
+            f"Mission Progress     : "
+            f"{self.tracker.progress():.1f}%"
+        )
+
         print("==============================")

@@ -1,21 +1,74 @@
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
+# ============================================================
+# ODYSSEY UAV - Git Ignore
+# ============================================================
 
+# Python virtual environments
 venv/
-.env
+.venv/
+env/
+ENV/
 
-.idea/
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python tooling/cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# IDE / Editor
 .vscode/
-
-Logs/
-
-*.log
-
-*.csv
-
-*.db
-
+.idea/
 *.swp
+*.swo
+*~
+
+# Operating system
 .DS_Store
+Thumbs.db
+
+# Runtime mission logs
+Logs/*.log
+
+# Runtime flight recorder data
+Logs/flight_data_*.csv
+
+# Generated mission reports
+Logs/latest_mission_report.txt
+
+# Keep Logs directory in repository
+!Logs/.gitkeep
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+
+# Build / distribution
+build/
+dist/
+*.egg-info/
+
+# Environment / secrets
+.env
+.env.*
+*.key
+*.pem
+
+# Local simulation artifacts
+*.ulg
+dataman
+parameters.bson
+parameters_backup.bson
+
+# Gazebo / PX4 runtime files
+log/
+rootfs/
+
+# Coverage / test output
+coverage.xml
+junit.xml
