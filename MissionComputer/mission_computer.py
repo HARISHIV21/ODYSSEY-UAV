@@ -5,6 +5,7 @@ from MissionComputer.battery_monitor import BatteryMonitor
 from MissionComputer.health_monitor import HealthMonitor
 from MissionComputer.failsafe_manager import FailsafeManager
 from MissionComputer.logger import MissionLogger
+from MissionComputer.flight_recorder import FlightRecorder
 
 
 class MissionComputer:
@@ -15,6 +16,8 @@ class MissionComputer:
         self.mission = mission
 
         self.logger = MissionLogger()
+
+        self.recorder = FlightRecorder()
 
         self.state_machine = StateMachine()
 
@@ -64,6 +67,10 @@ class MissionComputer:
             await self.failsafe.execute()
 
             raise
+
+        finally:
+
+            self.recorder.close()
 
     async def health_report(self):
 
