@@ -2,71 +2,63 @@
 
 ### Software-Defined Autonomous UAV Navigation & Mission Computer
 
-ODYSSEY UAV is a modular autonomous unmanned aerial vehicle software platform developed around **PX4 SITL, Gazebo and MAVSDK-Python**.
+ODYSSEY UAV is a modular autonomous flight software platform implementing mission management, waypoint navigation, offboard control, telemetry acquisition, health monitoring, failsafe handling, flight-data recording, and post-flight analysis.
 
-The project implements a software-based UAV mission computer capable of vehicle connection, health verification, autonomous takeoff, offboard flight, waypoint navigation, mission-state management, telemetry acquisition, flight-data recording, failsafe handling and autonomous landing.
-
-The complete system can be developed and validated without physical UAV hardware using Software-in-the-Loop simulation.
+The system is developed and validated entirely in **Software-in-the-Loop (SITL)** using **PX4 Autopilot, Gazebo, MAVSDK-Python, and Python**, enabling autonomous UAV software development without physical flight hardware.
 
 ---
 
-## System Architecture
+## System Overview
+
+ODYSSEY separates high-level mission intelligence from the underlying flight-control system.
 
 ```text
-                     +----------------------+
-                     |      Mission JSON    |
-                     +----------+-----------+
-                                |
-                                v
-                     +----------------------+
-                     |    Mission Loader    |
-                     +----------+-----------+
-                                |
-                                v
-+----------------------------------------------------------+
-|                    MISSION COMPUTER                      |
-|                                                          |
-|  +--------------+       +-----------------------------+  |
-|  | State Machine|<----->|       Mission Manager       |  |
-|  +--------------+       +--------------+--------------+  |
-|                                        |                 |
-|  +--------------+                      v                 |
-|  |Health Monitor|              +---------------+         |
-|  +--------------+              |Mission Executor|        |
-|                                +-------+-------+         |
-|  +--------------+                      |                 |
-|  |Battery Monitor|                     v                 |
-|  +--------------+              +---------------+         |
-|                                |Flight Manager |         |
-|  +--------------+              +-------+-------+         |
-|  |Failsafe Mgr. |                      |                 |
-|  +--------------+                      |                 |
-|                                        |                 |
-|  +--------------+     +----------------+---------------+ |
-|  |Flight Recorder|    |                                | |
-|  +--------------+     v                                v |
-|                 +-------------+                +----------+
-|                 | Navigation  |                | Offboard |
-|                 |   Engine    |                |Controller|
-|                 +-------------+                +----------+
-+----------------------------------------------------------+
-                         |
-                         v
-                  +-------------+
-                  |   MAVSDK    |
-                  +------+------+
-                         |
-                         v
-                  +-------------+
-                  |     PX4     |
-                  |    SITL     |
-                  +------+------+
-                         |
-                         v
-                  +-------------+
-                  |   Gazebo    |
-                  | x500 Model  |
-                  +-------------+
+                     Mission Definition
+                           mission.json
+                               |
+                               v
+                  +-------------------------+
+                  |    Mission Computer     |
+                  |-------------------------|
+                  | Mission Executor        |
+                  | Mission Manager         |
+                  | State Machine           |
+                  | Health Monitor          |
+                  | Battery Monitor         |
+                  | Failsafe Manager        |
+                  +------------+------------+
+                               |
+                               v
+                  +-------------------------+
+                  |   Navigation Engine     |
+                  |-------------------------|
+                  | Waypoint Tracking       |
+                  | Distance Calculation    |
+                  | Arrival Detection       |
+                  +------------+------------+
+                               |
+                               v
+                  +-------------------------+
+                  |  Offboard Controller    |
+                  +------------+------------+
+                               |
+                            MAVSDK
+                               |
+                               v
+                     +------------------+
+                     |     PX4 SITL     |
+                     +--------+---------+
+                              |
+                              v
+                     +------------------+
+                     |   Gazebo x500    |
+                     +------------------+
+
+Telemetry
+    |
+    +----> Flight Recorder ----> CSV Flight Data
+    |
+    +----> Post-Flight Analysis
 ```
 
 ---
@@ -74,29 +66,42 @@ The complete system can be developed and validated without physical UAV hardware
 ## Core Capabilities
 
 - Autonomous mission execution
+- JSON-defined waypoint missions
 - PX4 vehicle connection through MAVSDK
-- Pre-flight health verification
+- Automated pre-flight health verification
 - Autonomous arming and takeoff
-- Offboard position control
-- NED waypoint navigation
-- Real-time waypoint-distance calculation
-- Waypoint arrival detection
+- MAVSDK Offboard position control
+- Local NED waypoint navigation
+- Real-time waypoint arrival detection
 - Mission progress tracking
 - Mission state-machine architecture
 - Battery monitoring
-- Vehicle health monitoring
-- Telemetry acquisition
+- Vehicle-health monitoring
+- Autonomous failsafe handling
+- Automated landing and disarming
+- Live telemetry acquisition
 - CSV flight-data recording
-- Automatic mission reporting
-- Failsafe landing logic
-- Autonomous landing and disarming
-- PX4/Gazebo Software-in-the-Loop validation
+- Post-flight mission analysis
+- Commanded-vs-actual trajectory visualization
 
 ---
 
-## Mission State Machine
+## Autonomous Mission Demonstration
 
-ODYSSEY executes missions through deterministic mission states:
+The validation mission commands the simulated UAV to execute a square trajectory in the PX4 local **North-East-Down (NED)** coordinate frame.
+
+| Waypoint | North | East | Down |
+|---|---:|---:|---:|
+| WP1 | 5 m | 0 m | -10 m |
+| WP2 | 5 m | 5 m | -10 m |
+| WP3 | 0 m | 5 m | -10 m |
+| WP4 | 0 m | 0 m | -10 m |
+
+Nominal mission altitude:
+
+**10 m above the local origin**
+
+Mission sequence:
 
 ```text
 INITIALIZE
@@ -120,10 +125,7 @@ START_OFFBOARD
 MISSION
     |
     v
-WAYPOINT
-    |
-    +----> WAYPOINT
-    |        ...
+WAYPOINT 1 -> WAYPOINT 2 -> WAYPOINT 3 -> WAYPOINT 4
     |
     v
 LAND
@@ -135,269 +137,428 @@ DISARM
 COMPLETE
 ```
 
-Failure conditions can transition execution into the failsafe handling path.
+---
+
+## Simulation Environment
+
+The complete flight stack is validated using PX4 SITL and Gazebo with the x500 multicopter model.
+
+![PX4 Gazebo x500 simulation](Images/01_gazebo_x500_mission.png)
+
+This environment provides simulated vehicle dynamics, IMU, GNSS, magnetometer, barometer, actuator behavior, and MAVLink communication for repeatable software validation.
 
 ---
 
-## Navigation
+## Mission Computer Execution
 
-The navigation subsystem operates using the local **North-East-Down (NED)** coordinate frame.
+ODYSSEY coordinates the complete autonomous flight sequence through a dedicated mission state machine.
 
-For each mission waypoint, ODYSSEY calculates:
+![ODYSSEY mission execution](Images/02_mission_execution.png)
 
-- 3D distance
-- horizontal distance
-- vertical distance
-- waypoint arrival status
-
-A waypoint is marked complete once the vehicle enters the configured position tolerance.
-
-Example mission:
-
-```text
-WP1 -> N:5  E:0  D:-10
-WP2 -> N:5  E:5  D:-10
-WP3 -> N:0  E:5  D:-10
-WP4 -> N:0  E:0  D:-10
-```
-
-This produces a square autonomous flight trajectory at approximately 10 m altitude.
+The mission computer is responsible for coordinating vehicle connection, pre-flight verification, arming, takeoff, Offboard initialization, waypoint execution, landing, and mission completion.
 
 ---
 
-## Mission Progress
+## Navigation Engine
 
-During execution the mission computer reports mission completion status.
+Waypoint navigation is handled independently from the high-level mission state machine.
 
-Example:
+For each target, the navigation engine evaluates the UAV position relative to the commanded waypoint using the local NED coordinate frame.
+
+The three-dimensional position error is evaluated as:
 
 ```text
-========== MISSION PROGRESS ==========
-Completed : 3/4
-Remaining : 1
-Progress  : 75.0%
-======================================
+distance = sqrt(
+    north_error² +
+    east_error² +
+    down_error²
+)
 ```
+
+The waypoint is considered reached when the vehicle enters the configured arrival tolerance.
+
+![ODYSSEY waypoint navigation](Images/03_waypoint_navigation.png)
+
+This provides closed-loop mission progression based on measured PX4 telemetry rather than fixed timing assumptions.
 
 ---
 
 ## Flight Data Recorder
 
-ODYSSEY records flight telemetry into timestamped CSV files.
+ODYSSEY includes a telemetry recorder for capturing mission data during autonomous operation.
 
 Recorded parameters include:
 
 ```text
 Time
-North
-East
-Down
-Battery(%)
-FlightMode
+North Position
+East Position
+Down Position
+Battery Percentage
+Mission State
 ```
 
-Runtime flight logs are stored locally under:
+![ODYSSEY flight recorder](Images/04_flight_recorder.png)
+
+Flight records are stored as CSV data and can subsequently be processed by the post-flight analysis utilities.
+
+---
+
+## Post-Flight Analysis
+
+The mission-analysis utility extracts engineering metrics from recorded PX4 telemetry.
+
+Metrics include:
+
+- recorded mission duration
+- maximum altitude
+- travelled trajectory distance
+- North/East operating range
+- final position
+- horizontal return error
+- battery consumption
+- minimum recorded battery level
+- final recorded mission state
+
+![ODYSSEY post-flight report](Images/05_post_flight_report.png)
+
+This provides repeatable quantitative evidence in addition to visual simulator validation.
+
+---
+
+## QGroundControl Validation
+
+The autonomous mission can also be observed independently through QGroundControl.
+
+![QGroundControl Offboard flight validation](Images/06_qgroundcontrol_offboard_flight.png)
+
+QGroundControl provides an independent view of vehicle state, Offboard flight mode, altitude, battery telemetry, and the executed flight path.
+
+---
+
+## Trajectory Validation
+
+ODYSSEY includes a Python analysis utility that compares the commanded square mission with the trajectory reconstructed from recorded PX4 telemetry.
+
+![ODYSSEY autonomous trajectory validation](Images/07_trajectory_validation.png)
+
+Example validation from a completed SITL mission:
+
+| Metric | Result |
+|---|---:|
+| Mission geometry | 5 m × 5 m square |
+| Commanded altitude | 10 m |
+| Waypoints commanded | 4 |
+| Final North position | 0.10 m |
+| Final East position | 0.02 m |
+| Horizontal return error | 0.10 m |
+| Environment | PX4 SITL + Gazebo |
+
+The reported values correspond to a simulation run and are not presented as physical-flight performance measurements.
+
+---
+
+## Flight Recorder and Analysis Pipeline
 
 ```text
-Logs/
+PX4 Telemetry
+      |
+      v
+Telemetry Manager
+      |
+      v
+Flight Recorder
+      |
+      v
+flight_data_*.csv
+      |
+      +----------------------+
+      |                      |
+      v                      v
+Mission Report       Trajectory Analysis
+      |                      |
+      v                      v
+Engineering Metrics   Validation Figure
 ```
-
-Generated runtime logs are intentionally excluded from version control.
 
 ---
 
 ## Failsafe Architecture
 
-The mission computer contains a dedicated failsafe manager.
+The mission computer includes a dedicated failsafe manager.
 
 Monitored conditions include:
 
-- battery state
-- vehicle health
+- vehicle-health status
+- battery condition
 - mission execution exceptions
 
-The failsafe path attempts to:
+When a critical mission exception occurs, ODYSSEY attempts to transition the vehicle to a safe condition by:
 
 ```text
-Detect Failure
-     |
-     v
+Mission Failure
+      |
+      v
+FAILSAFE
+      |
+      v
 Stop Offboard Control
-     |
-     v
+      |
+      v
 Command Landing
-     |
-     v
-Disarm Vehicle
-     |
-     v
-Safe State
+      |
+      v
+Disarm when appropriate
 ```
+
+The architecture keeps failsafe handling separate from normal mission execution.
 
 ---
 
-## Project Structure
+## Repository Structure
 
 ```text
-UAV_Project/
+ODYSSEY-UAV/
 |
-+-- Communication/
-+-- Config/
-+-- Control/
-+-- Core/
-+-- Data/
-+-- Documentation/
-+-- Logs/
-+-- MissionComputer/
-|   +-- battery_monitor.py
-|   +-- failsafe_manager.py
-|   +-- flight_manager.py
-|   +-- flight_recorder.py
-|   +-- health_monitor.py
-|   +-- logger.py
-|   +-- mission_computer.py
-|   +-- mission_executor.py
-|   +-- mission_manager.py
-|   +-- offboard_controller.py
-|   +-- state_machine.py
-|   +-- telemetry_manager.py
+├── MissionComputer/
+│   ├── mission_computer.py
+│   ├── mission_manager.py
+│   ├── mission_executor.py
+│   ├── flight_manager.py
+│   ├── offboard_controller.py
+│   ├── telemetry_manager.py
+│   ├── health_monitor.py
+│   ├── battery_monitor.py
+│   ├── failsafe_manager.py
+│   ├── flight_recorder.py
+│   └── state_machine.py
 |
-+-- Navigation/
-|   +-- distance.py
-|   +-- mission_loader.py
-|   +-- mission_planner.py
-|   +-- navigation_engine.py
-|   +-- trajectory.py
-|   +-- waypoint_tracker.py
+├── Navigation/
+│   ├── navigation_engine.py
+│   ├── waypoint_tracker.py
+│   ├── distance.py
+│   ├── mission_loader.py
+│   └── mission_planner.py
 |
-+-- Sensors/
-+-- Telemetry/
-+-- Utils/
-|   +-- mission_report.py
+├── Utils/
+│   ├── mission_report.py
+│   └── plot_trajectory.py
 |
-+-- Missions/
-+-- app.py
-+-- requirements.txt
-+-- LICENSE
-+-- README.md
+├── Data/
+│   └── mission.json
+|
+├── Documentation/
+│   ├── ARCHITECTURE.md
+│   ├── INSTALL.md
+│   ├── USER_GUIDE.md
+│   └── API.md
+|
+├── Images/
+│   └── validation figures
+|
+├── Logs/
+│   └── .gitkeep
+|
+├── app.py
+├── requirements.txt
+├── README.md
+├── LICENSE
+└── .gitignore
 ```
 
 ---
 
 ## Technology Stack
 
-- Python 3
-- MAVSDK-Python
-- PX4 Autopilot
-- PX4 SITL
-- Gazebo
-- AsyncIO
-- Git / GitHub
-- Ubuntu / WSL
+| Technology | Role |
+|---|---|
+| Python | Mission-computer software |
+| MAVSDK-Python | PX4 command and telemetry interface |
+| PX4 Autopilot | Flight-control stack |
+| Gazebo | UAV physics simulation |
+| MAVLink | Vehicle communication |
+| QGroundControl | Independent vehicle monitoring |
+| Matplotlib | Flight trajectory visualization |
+| Git / GitHub | Version control and project documentation |
 
 ---
 
-## Running ODYSSEY
+## Mission Definition
 
-### Terminal 1 — Start PX4 SITL
+Mission geometry is separated from the mission-control implementation.
 
-```bash
-cd ~/Projects/PX4-Autopilot
-HEADLESS=1 make px4_sitl gz_x500
+Example:
+
+```json
+{
+    "mission_name": "Square Flight",
+    "takeoff_altitude": 10,
+    "waypoints": [
+        {
+            "north": 5,
+            "east": 0,
+            "down": -10,
+            "yaw": 0
+        },
+        {
+            "north": 5,
+            "east": 5,
+            "down": -10,
+            "yaw": 90
+        },
+        {
+            "north": 0,
+            "east": 5,
+            "down": -10,
+            "yaw": 180
+        },
+        {
+            "north": 0,
+            "east": 0,
+            "down": -10,
+            "yaw": 270
+        }
+    ]
+}
 ```
 
-Wait until PX4 reaches:
+This allows mission trajectories to be changed without modifying the core mission-computer logic.
 
-```text
-pxh>
-```
+---
 
-### Terminal 2 — Start the Mission Computer
+## Running the Simulation
+
+### 1. Start PX4 SITL with Gazebo
+
+From the PX4 Autopilot directory:
 
 ```bash
-cd ~/UAV_Project
+make px4_sitl gz_x500
+```
+
+Wait until PX4 completes initialization and the vehicle passes its required pre-flight checks.
+
+### 2. Activate the ODYSSEY environment
+
+From the project directory:
+
+```bash
 source venv/bin/activate
+```
+
+### 3. Execute the autonomous mission
+
+```bash
 python app.py
 ```
 
----
+### 4. Generate the post-flight report
 
-## Example Successful Mission
+```bash
+python Utils/mission_report.py
+```
 
-A successful ODYSSEY mission performs:
+### 5. Generate trajectory validation
+
+```bash
+python Utils/plot_trajectory.py
+```
+
+The generated trajectory figure is stored in:
 
 ```text
-PX4 Connection
-      |
-Vehicle Health Check
-      |
-     ARM
-      |
-   TAKEOFF
-      |
-Start Offboard Control
-      |
-Waypoint Navigation
-      |
-Mission Progress = 100%
-      |
-     LAND
-      |
-    DISARM
-      |
-MISSION COMPLETE
+Images/07_trajectory_validation.png
 ```
 
 ---
 
-## Simulation Validation
+## Engineering Design Principles
 
-The system has been validated in PX4/Gazebo SITL using an x500 multicopter simulation.
+ODYSSEY was structured around several software-engineering principles relevant to autonomous and embedded systems:
 
-Validated functionality includes:
+**Modularity** — mission execution, navigation, telemetry, safety monitoring, and analysis are separated into dedicated modules.
 
-- PX4 connection
-- health verification
-- autonomous arming
-- autonomous takeoff
-- offboard control
-- four-waypoint square navigation
-- waypoint arrival detection
-- 100% mission progress
-- telemetry recording
-- autonomous landing
-- disarming
-- mission completion
+**State-based execution** — mission progression is represented explicitly through mission states rather than a single procedural flight script.
+
+**Telemetry-driven navigation** — waypoint completion depends on measured vehicle position.
+
+**Safety separation** — failsafe handling is isolated from nominal mission execution.
+
+**Configuration-driven missions** — waypoint definitions are stored separately from navigation logic.
+
+**Post-flight verification** — recorded telemetry is used to quantitatively evaluate mission execution.
 
 ---
 
-## Design Philosophy
+## Validation Scope
 
-ODYSSEY separates mission-level autonomy from low-level flight control.
+ODYSSEY is currently a **software-only autonomous UAV project**.
 
-PX4 handles vehicle stabilization and low-level flight control while ODYSSEY operates as the higher-level mission computer responsible for mission sequencing, navigation decisions, monitoring, telemetry and safety management.
+Validation has been performed using:
 
-This modular separation allows additional autonomy functions to be integrated without redesigning the complete flight-control stack.
+- PX4 Software-in-the-Loop
+- Gazebo x500 multicopter simulation
+- MAVSDK Offboard control
+- QGroundControl monitoring
+- recorded PX4 telemetry
+- post-flight trajectory analysis
+
+The current results therefore demonstrate **SITL software validation**, not hardware-in-the-loop or physical UAV flight testing.
 
 ---
 
-## Future Extensions
+## Future Development
 
-Potential future development includes:
+Potential extensions include:
 
+- dynamic waypoint replanning
 - obstacle avoidance
-- path replanning
-- computer-vision perception
 - GNSS-denied navigation
-- sensor fusion
+- visual-inertial odometry
+- computer-vision perception
 - geofencing
-- return-to-home logic
+- mission abort/recovery strategies
+- redundant state estimation
 - ROS 2 integration
-- multi-UAV coordination
-- hardware flight-computer deployment
+- Hardware-in-the-Loop validation
+- deployment to an embedded companion computer
+
+---
+
+## Documentation
+
+Additional engineering documentation is available under:
+
+```text
+Documentation/
+├── ARCHITECTURE.md
+├── INSTALL.md
+├── USER_GUIDE.md
+└── API.md
+```
+
+---
+
+## Project Status
+
+**Autonomous mission pipeline:** Implemented
+**Waypoint navigation:** Implemented
+**PX4 Offboard control:** Implemented
+**Telemetry recording:** Implemented
+**Health monitoring:** Implemented
+**Failsafe management:** Implemented
+**Post-flight analysis:** Implemented
+**SITL validation:** Completed
+**Physical flight validation:** Not performed
 
 ---
 
 ## License
 
-See `LICENSE` for licensing information.
+See the repository `LICENSE` file for licensing information.
+
+---
+
+### ODYSSEY UAV
+
+**Autonomous Navigation • Mission Computing • PX4 • MAVSDK • Software-in-the-Loop**
