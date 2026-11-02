@@ -1,0 +1,212 @@
+==================================================
+MISSION LOADING AND VALIDATION
+==================================================
+
+FILE: Data/Missions/mission.json
+--------------------------------------------------
+{
+    "mission_name": "Demo Mission",
+    "takeoff_altitude": 20,
+    "waypoints": [
+        {
+            "x": 10,
+            "y": 5,
+            "z": 10
+        },
+        {
+            "x": 25,
+            "y": 10,
+            "z": 15
+        },
+        {
+            "x": 40,
+            "y": 15,
+            "z": 20
+        }
+    ],
+    "landing": true
+}
+
+FILE: Navigation/mission_loader.py
+--------------------------------------------------
+import json
+from pathlib import Path
+
+from Navigation.mission_planner import MissionPlanner
+from Navigation.mission_validator import MissionValidator
+
+
+class MissionLoader:
+    """Loads mission configuration from a JSON file."""
+
+    def __init__(self, mission_path="Data/mission.json"):
+        self.mission_path = Path(mission_path)
+        self.planner = MissionPlanner()
+
+    def load(self):
+        if not self.mission_path.is_file():
+            raise FileNotFoundError(
+                f"Mission file not found: {self.mission_path}"
+            )
+
+        with self.mission_path.open("r", encoding="utf-8") as file:
+            mission = json.load(file)
+
+        MissionValidator.validate(mission)
+        self.planner.load(mission)
+        return mission
+
+    def planner_instance(self):
+        return self.planner
+
+    def print_summary(self, mission):
+        print("\nMission Loaded")
+        print("------------------------")
+        print(f"Mission : {mission['mission_name']}")
+        print(f"Waypoints : {len(mission['waypoints'])}")
+        self.planner.show()
+
+FILE: Navigation/mission_validator.py
+--------------------------------------------------
+import math
+
+
+class MissionValidationError(ValueError):
+    """Raised when a mission configuration is invalid."""
+
+
+class MissionValidator:
+    """Validates mission configuration before flight execution."""
+
+    REQUIRED_MISSION_FIELDS = (
+        "mission_name",
+        "takeoff_altitude",
+        "waypoints",
+    )
+
+    REQUIRED_WAYPOINT_FIELDS = (
+        "north",
+        "east",
+        "down",
+    )
+
+    @classmethod
+    def validate(cls, mission):
+        if not isinstance(mission, dict):
+            raise MissionValidationError(
+                "Mission must be a JSON object."
+            )
+
+        for field in cls.REQUIRED_MISSION_FIELDS:
+            if field not in mission:
+                raise MissionValidationError(
+                    f"Missing mission field: {field}"
+                )
+
+        if not isinstance(mission["mission_name"], str):
+            raise MissionValidationError(
+                "mission_name must be a string."
+            )
+
+        if not mission["mission_name"].strip():
+            raise MissionValidationError(
+                "mission_name cannot be empty."
+            )
+
+        cls._validate_number(
+            mission["takeoff_altitude"],
+            "takeoff_altitude",
+            minimum_exclusive=0,
+        )
+
+        waypoints = mission["waypoints"]
+
+        if not isinstance(waypoints, list) or not waypoints:
+            raise MissionValidationError(
+                "Mission must contain at least one waypoint."
+            )
+
+        for index, waypoint in enumerate(waypoints):
+            if not isinstance(waypoint, dict):
+                raise MissionValidationError(
+                    f"Waypoint {index + 1} must be an object."
+                )
+
+            for field in cls.REQUIRED_WAYPOINT_FIELDS:
+                if field not in waypoint:
+                    raise MissionValidationError(
+                        f"Waypoint {index + 1} is missing '{field}'."
+                    )
+
+                cls._validate_number(
+                    waypoint[field],
+                    f"Waypoint {index + 1} {field}",
+                )
+
+            if "yaw" in waypoint:
+                cls._validate_number(
+                    waypoint["yaw"],
+                    f"Waypoint {index + 1} yaw",
+                )
+
+        return True
+
+    @staticmethod
+    def _validate_number(value, field_name, minimum_exclusive=None):
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise MissionValidationError(
+                f"{field_name} must be a number."
+            )
+
+        if not math.isfinite(value):
+            raise MissionValidationError(
+                f"{field_name} must be finite."
+            )
+
+        if minimum_exclusive is not None and value <= minimum_exclusive:
+            raise MissionValidationError(
+                f"{field_name} must be greater than {minimum_exclusive}."
+            )
+
+FILE: Navigation/mission_planner.py
+--------------------------------------------------
+class MissionPlanner:
+
+    def __init__(self):
+        self.waypoints = []
+
+    def load(self, mission):
+
+        self.waypoints.clear()
+
+        for wp in mission["waypoints"]:
+            self.waypoints.append(
+                {
+                    "north": wp["north"],
+                    "east": wp["east"],
+                    "down": wp["down"]
+                }
+            )
+
+    def total_waypoints(self):
+
+        return len(self.waypoints)
+
+    def get_waypoint(self, index):
+
+        return self.waypoints[index]
+
+    def show(self):
+
+        print("\n========== MISSION PLAN ==========")
+
+        for i, wp in enumerate(self.waypoints):
+
+            print(
+                f"{i+1}. "
+                f"N:{wp['north']}  "
+                f"E:{wp['east']}  "
+                f"D:{wp['down']}"
+            )
+
+        print("==================================")

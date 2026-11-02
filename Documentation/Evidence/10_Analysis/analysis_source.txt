@@ -1,0 +1,495 @@
+==================================================
+TRAJECTORY ANALYSIS SOURCE
+==================================================
+
+FILE: Utils/mission_report.py
+--------------------------------------------------
+import csv
+import glob
+import math
+import os
+
+
+class MissionReport:
+
+    def __init__(self, log_directory="Logs"):
+        self.log_directory = log_directory
+
+    def latest_flight_log(self):
+        files = glob.glob(
+            os.path.join(
+                self.log_directory,
+                "flight_data_*.csv"
+            )
+        )
+
+        if not files:
+            return None
+
+        return max(files, key=os.path.getmtime)
+
+    def load_data(self, filename):
+        data = []
+
+        with open(filename, "r", newline="") as file:
+            reader = csv.DictReader(file)
+
+            for row in reader:
+                try:
+                    data.append({
+                        "time": float(row["Time"]),
+                        "north": float(row["North"]),
+                        "east": float(row["East"]),
+                        "down": float(row["Down"]),
+                        "battery": float(row["Battery(%)"]),
+                        "mode": row["FlightMode"],
+                    })
+
+                except (ValueError, KeyError):
+                    continue
+
+        return data
+
+    @staticmethod
+    def calculate_distance(data):
+        total_distance = 0.0
+
+        for previous, current in zip(data, data[1:]):
+            dn = current["north"] - previous["north"]
+            de = current["east"] - previous["east"]
+            dd = current["down"] - previous["down"]
+
+            total_distance += math.sqrt(
+                dn * dn +
+                de * de +
+                dd * dd
+            )
+
+        return total_distance
+
+    def generate(self):
+        filename = self.latest_flight_log()
+
+        print("\n========================================")
+        print("        ODYSSEY POST-FLIGHT REPORT")
+        print("========================================")
+
+        if filename is None:
+            print("No flight recorder data found.")
+            print("========================================")
+            return
+
+        data = self.load_data(filename)
+
+        if not data:
+            print("Flight log contains no valid data.")
+            print("========================================")
+            return
+
+        first = data[0]
+        last = data[-1]
+
+        duration = max(
+            0.0,
+            last["time"] - first["time"]
+        )
+
+        max_altitude = max(
+            0.0,
+            max(-row["down"] for row in data)
+        )
+
+        min_battery = min(
+            row["battery"] for row in data
+        )
+
+        start_battery = first["battery"]
+        end_battery = last["battery"]
+
+        battery_used = max(
+            0.0,
+            start_battery - end_battery
+        )
+
+        min_north = min(
+            row["north"] for row in data
+        )
+
+        max_north = max(
+            row["north"] for row in data
+        )
+
+        min_east = min(
+            row["east"] for row in data
+        )
+
+        max_east = max(
+            row["east"] for row in data
+        )
+
+        total_distance = self.calculate_distance(data)
+
+        horizontal_from_origin = math.sqrt(
+            last["north"] ** 2 +
+            last["east"] ** 2
+        )
+
+        print(f"Flight Log          : {filename}")
+        print(f"Samples Recorded    : {len(data)}")
+        print(f"Recorded Duration   : {duration:.2f} s")
+        print(f"Maximum Altitude    : {max_altitude:.2f} m")
+        print(f"Recorded Distance   : {total_distance:.2f} m")
+
+        print("----------------------------------------")
+
+        print(
+            f"North Range         : "
+            f"{min_north:.2f} to {max_north:.2f} m"
+        )
+
+        print(
+            f"East Range          : "
+            f"{min_east:.2f} to {max_east:.2f} m"
+        )
+
+        print(
+            f"Last Position       : "
+            f"N={last['north']:.2f}, "
+            f"E={last['east']:.2f}, "
+            f"D={last['down']:.2f}"
+        )
+
+        print(
+            f"Horizontal Return   : "
+            f"{horizontal_from_origin:.2f} m from origin"
+        )
+
+        print("----------------------------------------")
+
+        print(f"Start Battery       : {start_battery:.1f}%")
+        print(f"End Battery         : {end_battery:.1f}%")
+        print(f"Minimum Battery     : {min_battery:.1f}%")
+        print(f"Battery Used        : {battery_used:.1f}%")
+
+        print("----------------------------------------")
+
+        print(f"Last Recorded State : {last['mode']}")
+        print("Data Source         : PX4 SITL telemetry")
+        print("Coordinate Frame    : Local NED (m)")
+        print("Simulation Platform : PX4 SITL + Gazebo")
+
+        print("========================================")
+
+
+if __name__ == "__main__":
+    report = MissionReport()
+    report.generate()
+
+FILE: Utils/plot_trajectory.py
+--------------------------------------------------
+import csv
+import glob
+import os
+
+import matplotlib.pyplot as plt
+
+
+LOG_DIRECTORY = "Logs"
+OUTPUT_DIRECTORY = "Images"
+OUTPUT_FILE = "07_trajectory_validation.png"
+
+
+def find_latest_log():
+    """Return the newest ODYSSEY flight recorder CSV."""
+
+    pattern = os.path.join(
+        LOG_DIRECTORY,
+        "flight_data_*.csv"
+    )
+
+    files = glob.glob(pattern)
+
+    if not files:
+        raise FileNotFoundError(
+            "No flight_data_*.csv files found in Logs/"
+        )
+
+    return max(files, key=os.path.getmtime)
+
+
+def load_trajectory(filename):
+    """Load North/East position data from flight recorder."""
+
+    north = []
+    east = []
+
+    with open(filename, "r", newline="") as file:
+
+        reader = csv.DictReader(file)
+
+        for row in reader:
+
+            try:
+                north_value = float(row["North"])
+                east_value = float(row["East"])
+
+                north.append(north_value)
+                east.append(east_value)
+
+            except (ValueError, KeyError):
+                continue
+
+    if not north:
+        raise RuntimeError(
+            "No valid North/East trajectory data found."
+        )
+
+    return north, east
+
+
+def calculate_horizontal_error(north, east):
+    """Calculate final horizontal distance from origin."""
+
+    final_north = north[-1]
+    final_east = east[-1]
+
+    return (
+        final_north ** 2
+        + final_east ** 2
+    ) ** 0.5
+
+
+def create_plot(north, east, source_file):
+
+    # -------------------------------------------------
+    # Commanded ODYSSEY square mission
+    #
+    # Start -> WP1 -> WP2 -> WP3 -> WP4
+    #
+    # N:0 E:0
+    # N:5 E:0
+    # N:5 E:5
+    # N:0 E:5
+    # N:0 E:0
+    # -------------------------------------------------
+
+    commanded_north = [
+        0,
+        5,
+        5,
+        0,
+        0,
+    ]
+
+    commanded_east = [
+        0,
+        0,
+        5,
+        5,
+        0,
+    ]
+
+    figure, axis = plt.subplots(
+        figsize=(9, 8)
+    )
+
+    # Commanded mission path
+    axis.plot(
+        commanded_east,
+        commanded_north,
+        "--",
+        linewidth=2.2,
+        label="Commanded Trajectory",
+    )
+
+    # Actual PX4 trajectory
+    axis.plot(
+        east,
+        north,
+        "-o",
+        linewidth=2.0,
+        markersize=4,
+        label="PX4 Actual Trajectory",
+    )
+
+    # Mission waypoints
+    axis.scatter(
+        commanded_east[1:],
+        commanded_north[1:],
+        s=80,
+        marker="D",
+        label="Mission Waypoints",
+        zorder=5,
+    )
+
+    # Start position
+    axis.scatter(
+        east[0],
+        north[0],
+        s=120,
+        marker="s",
+        label="Start Position",
+        zorder=6,
+    )
+
+    # Final recorded position
+    axis.scatter(
+        east[-1],
+        north[-1],
+        s=140,
+        marker="X",
+        label="Final Position",
+        zorder=7,
+    )
+
+    # Waypoint labels
+    waypoint_labels = [
+        "WP1",
+        "WP2",
+        "WP3",
+        "WP4",
+    ]
+
+    waypoint_positions = [
+        (0, 5),
+        (5, 5),
+        (5, 0),
+        (0, 0),
+    ]
+
+    for label, position in zip(
+        waypoint_labels,
+        waypoint_positions
+    ):
+
+        wp_east, wp_north = position
+
+        axis.annotate(
+            label,
+            (wp_east, wp_north),
+            xytext=(7, 7),
+            textcoords="offset points",
+            fontsize=9,
+        )
+
+    horizontal_error = calculate_horizontal_error(
+        north,
+        east
+    )
+
+    # Engineering information box
+    information = (
+        f"Samples: {len(north)}\n"
+        f"Final N: {north[-1]:.2f} m\n"
+        f"Final E: {east[-1]:.2f} m\n"
+        f"Return Error: {horizontal_error:.2f} m"
+    )
+
+    axis.text(
+        0.02,
+        0.98,
+        information,
+        transform=axis.transAxes,
+        verticalalignment="top",
+        bbox={
+            "boxstyle": "round",
+            "alpha": 0.15,
+        },
+    )
+
+    axis.set_title(
+        "ODYSSEY UAV\n"
+        "Autonomous Waypoint Navigation Validation",
+        fontsize=15,
+        pad=15,
+    )
+
+    axis.set_xlabel(
+        "East Position (m)",
+        fontsize=11,
+    )
+
+    axis.set_ylabel(
+        "North Position (m)",
+        fontsize=11,
+    )
+
+    axis.grid(
+        True,
+        linestyle="--",
+        alpha=0.4,
+    )
+
+    axis.legend(
+        loc="best",
+        frameon=True,
+    )
+
+    axis.axis("equal")
+
+    figure.text(
+        0.5,
+        0.015,
+        "PX4 SITL + Gazebo | MAVSDK Offboard Control | Local NED Frame",
+        ha="center",
+        fontsize=9,
+    )
+
+    os.makedirs(
+        OUTPUT_DIRECTORY,
+        exist_ok=True
+    )
+
+    output_path = os.path.join(
+        OUTPUT_DIRECTORY,
+        OUTPUT_FILE
+    )
+
+    plt.tight_layout(
+        rect=[0, 0.04, 1, 1]
+    )
+
+    figure.savefig(
+        output_path,
+        dpi=300,
+        bbox_inches="tight",
+    )
+
+    plt.close(figure)
+
+    print()
+    print("========================================")
+    print(" ODYSSEY TRAJECTORY VALIDATION")
+    print("========================================")
+    print(f"Source Log       : {source_file}")
+    print(f"Samples          : {len(north)}")
+    print(
+        f"Final Position   : "
+        f"N={north[-1]:.2f} m, "
+        f"E={east[-1]:.2f} m"
+    )
+    print(
+        f"Return Error     : "
+        f"{horizontal_error:.2f} m"
+    )
+    print(f"Output           : {output_path}")
+    print("========================================")
+
+
+def main():
+
+    source_file = find_latest_log()
+
+    north, east = load_trajectory(
+        source_file
+    )
+
+    create_plot(
+        north,
+        east,
+        source_file
+    )
+
+
+if __name__ == "__main__":
+    main()

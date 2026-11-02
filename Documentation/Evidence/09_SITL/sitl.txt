@@ -1,0 +1,53 @@
+PX4 AND GAZEBO PROCESSES
+450 make px4_sitl gz_x500
+508 /bin/sh -c cmake --build "/home/harish/Projects/PX4-Autopilot/build/px4_sitl_default" --  gz_x500
+509 cmake --build /home/harish/Projects/PX4-Autopilot/build/px4_sitl_default -- gz_x500
+3364 /bin/sh -c cd /home/harish/Projects/PX4-Autopilot/build/px4_sitl_default/src/modules/simulation/gz_bridge && /usr/bin/cmake -E env PX4_SIM_MODEL=gz_x500 GZ_IP=127.0.0.1 /home/harish/Projects/PX4-Autopilot/build/px4_sitl_default/bin/px4
+3365 /usr/bin/cmake -E env PX4_SIM_MODEL=gz_x500 GZ_IP=127.0.0.1 /home/harish/Projects/PX4-Autopilot/build/px4_sitl_default/bin/px4
+3366 /home/harish/Projects/PX4-Autopilot/build/px4_sitl_default/bin/px4
+3548 gz sim --verbose=1 -r -s /home/harish/Projects/PX4-Autopilot/Tools/simulation/gz/worlds/default.sdf
+3549 gz sim -g
+
+SIMULATION LOGS
+-rw-r--r-- 1 harish harish 147 Jul 30 15:56 Logs/mission_20260730_155622.log
+-rw-r--r-- 1 harish harish 325 Jul 30 15:58 Logs/mission_20260730_155748.log
+-rw-r--r-- 1 harish harish 325 Jul 30 16:00 Logs/mission_20260730_160028.log
+-rw-r--r-- 1 harish harish 325 Jul 30 16:05 Logs/mission_20260730_160442.log
+-rw-r--r-- 1 harish harish 147 Jul 30 17:58 Logs/mission_20260730_175857.log
+-rw-r--r-- 1 harish harish 147 Jul 30 18:04 Logs/mission_20260730_180429.log
+-rw-r--r-- 1 harish harish 147 Jul 30 18:07 Logs/mission_20260730_180739.log
+-rw-r--r-- 1 harish harish 325 Jul 30 18:14 Logs/mission_20260730_181356.log
+-rw-r--r-- 1 harish harish 325 Jul 30 18:16 Logs/mission_20260730_181534.log
+-rw-r--r-- 1 harish harish 325 Jul 30 18:28 Logs/mission_20260730_182741.log
+-rw-r--r-- 1 harish harish 325 Jul 30 18:34 Logs/mission_20260730_183404.log
+-rw-r--r-- 1 harish harish 325 Jul 30 18:39 Logs/mission_20260730_183836.log
+-rw-r--r-- 1 harish harish 325 Jul 31 11:48 Logs/mission_20260731_114825.log
+-rw-r--r-- 1 harish harish 352 Jul 31 11:54 Logs/mission_20260731_115354.log
+-rw-r--r-- 1 harish harish 352 Jul 31 11:59 Logs/mission_20260731_115918.log
+-rw-r--r-- 1 harish harish 325 Jul 31 12:24 Logs/mission_20260731_122345.log
+-rw-r--r-- 1 harish harish 325 Jul 31 12:29 Logs/mission_20260731_122835.log
+-rw-r--r-- 1 harish harish 325 Jul 31 12:35 Logs/mission_20260731_123458.log
+-rw-r--r-- 1 harish harish 325 Jul 31 12:39 Logs/mission_20260731_123810.log
+-rw-r--r-- 1 harish harish 147 Jul 31 12:42 Logs/mission_20260731_124253.log
+-rw-r--r-- 1 harish harish 325 Jul 31 12:45 Logs/mission_20260731_124434.log
+-rw-r--r-- 1 harish harish 325 Jul 31 12:53 Logs/mission_20260731_125213.log
+-rw-r--r-- 1 harish harish 325 Jul 31 13:50 Logs/mission_20260731_134950.log
+-rw-r--r-- 1 harish harish 325 Jul 31 13:54 Logs/mission_20260731_135331.log
+-rw-r--r-- 1 harish harish 325 Jul 31 13:58 Logs/mission_20260731_135750.log
+-rw-r--r-- 1 harish harish 325 Jul 31 14:31 Logs/mission_20260731_142944.log
+-rw-r--r-- 1 harish harish 380 Jul 31 14:38 Logs/mission_20260731_143846.log
+-rw-r--r-- 1 harish harish 380 Jul 31 14:39 Logs/mission_20260731_143948.log
+-rw-r--r-- 1 harish harish 325 Aug  1 14:11 Logs/mission_20260801_141034.log
+-rw-r--r-- 1 harish harish 325 Aug  1 14:13 Logs/mission_20260801_141233.log
+-rw-r--r-- 1 harish harish 325 Aug  2 05:39 Logs/mission_20260802_053820.log
+-rw-r--r-- 1 harish harish 325 Aug  2 05:43 Logs/mission_20260802_054238.log
+-rw-r--r-- 1 harish harish 325 Aug  2 11:07 Logs/mission_20260802_110606.log
+-rw-r--r-- 1 harish harish 235 Aug  2 11:07 Logs/mission_20260802_110744.log
+-rw-r--r-- 1 harish harish 325 Aug  2 11:08 Logs/mission_20260802_110817.log
+-rw-r--r-- 1 harish harish 325 Oct 30 21:46 Logs/mission_20261030_214523.log
+-rw-r--r-- 1 harish harish 325 Oct 30 21:48 Logs/mission_20261030_214736.log
+-rw-r--r-- 1 harish harish 325 Oct 30 23:07 Logs/mission_20261030_230710.log
+-rw-r--r-- 1 harish harish 325 Oct 31 09:54 Logs/mission_20261031_095357.log
+-rw-r--r-- 1 harish harish 235 Oct 31 10:03 Logs/mission_20261031_100314.log
+-rw-r--r-- 1 harish harish 325 Nov  1 13:33 Logs/mission_20261101_133157.log
+-rw-r--r-- 1 harish harish 325 Nov  1 20:49 Logs/mission_20261101_204809.log

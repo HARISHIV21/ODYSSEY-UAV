@@ -1,0 +1,281 @@
+import csv
+import os
+from datetime import datetime
+
+
+class FlightRecorder:
+
+    def __init__(self):
+
+        os.makedirs("Logs", exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        self.filename = f"Logs/flight_data_{timestamp}.csv"
+
+        self.file = open(self.filename, "w", newline="")
+
+        self.writer = csv.writer(self.file)
+
+        self.writer.writerow([
+            "Time",
+            "North",
+            "East",
+            "Down",
+            "Battery(%)",
+            "FlightMode"
+        ])
+
+        self.closed = False
+
+        print(f"[RECORDER] Logging to {self.filename}")
+
+    def record(
+        self,
+        elapsed_time,
+        north,
+        east,
+        down,
+        battery,
+        mode
+    ):
+
+        if self.closed:
+            return
+
+        self.writer.writerow([
+            f"{elapsed_time:.2f}",
+            f"{north:.2f}",
+            f"{east:.2f}",
+            f"{down:.2f}",
+            f"{battery:.1f}",
+            mode
+        ])
+
+        self.file.flush()
+
+    def close(self):
+
+        if self.closed:
+            return
+
+        self.closed = True
+
+        self.file.close()
+
+        print("[RECORDER] Flight log saved")
+
+import csv
+import glob
+import math
+import os
+
+
+class MissionReport:
+
+    def __init__(self, log_directory="Logs"):
+        self.log_directory = log_directory
+
+    def latest_flight_log(self):
+        files = glob.glob(
+            os.path.join(
+                self.log_directory,
+                "flight_data_*.csv"
+            )
+        )
+
+        if not files:
+            return None
+
+        return max(files, key=os.path.getmtime)
+
+    def load_data(self, filename):
+        data = []
+
+        with open(filename, "r", newline="") as file:
+            reader = csv.DictReader(file)
+
+            for row in reader:
+                try:
+                    data.append({
+                        "time": float(row["Time"]),
+                        "north": float(row["North"]),
+                        "east": float(row["East"]),
+                        "down": float(row["Down"]),
+                        "battery": float(row["Battery(%)"]),
+                        "mode": row["FlightMode"],
+                    })
+
+                except (ValueError, KeyError):
+                    continue
+
+        return data
+
+    @staticmethod
+    def calculate_distance(data):
+        total_distance = 0.0
+
+        for previous, current in zip(data, data[1:]):
+            dn = current["north"] - previous["north"]
+            de = current["east"] - previous["east"]
+            dd = current["down"] - previous["down"]
+
+            total_distance += math.sqrt(
+                dn * dn +
+                de * de +
+                dd * dd
+            )
+
+        return total_distance
+
+    def generate(self):
+        filename = self.latest_flight_log()
+
+        print("\n========================================")
+        print("        ODYSSEY POST-FLIGHT REPORT")
+        print("========================================")
+
+        if filename is None:
+            print("No flight recorder data found.")
+            print("========================================")
+            return
+
+        data = self.load_data(filename)
+
+        if not data:
+            print("Flight log contains no valid data.")
+            print("========================================")
+            return
+
+        first = data[0]
+        last = data[-1]
+
+        duration = max(
+            0.0,
+            last["time"] - first["time"]
+        )
+
+        max_altitude = max(
+            0.0,
+            max(-row["down"] for row in data)
+        )
+
+        min_battery = min(
+            row["battery"] for row in data
+        )
+
+        start_battery = first["battery"]
+        end_battery = last["battery"]
+
+        battery_used = max(
+            0.0,
+            start_battery - end_battery
+        )
+
+        min_north = min(
+            row["north"] for row in data
+        )
+
+        max_north = max(
+            row["north"] for row in data
+        )
+
+        min_east = min(
+            row["east"] for row in data
+        )
+
+        max_east = max(
+            row["east"] for row in data
+        )
+
+        total_distance = self.calculate_distance(data)
+
+        horizontal_from_origin = math.sqrt(
+            last["north"] ** 2 +
+            last["east"] ** 2
+        )
+
+        print(f"Flight Log          : {filename}")
+        print(f"Samples Recorded    : {len(data)}")
+        print(f"Recorded Duration   : {duration:.2f} s")
+        print(f"Maximum Altitude    : {max_altitude:.2f} m")
+        print(f"Recorded Distance   : {total_distance:.2f} m")
+
+        print("----------------------------------------")
+
+        print(
+            f"North Range         : "
+            f"{min_north:.2f} to {max_north:.2f} m"
+        )
+
+        print(
+            f"East Range          : "
+            f"{min_east:.2f} to {max_east:.2f} m"
+        )
+
+        print(
+            f"Last Position       : "
+            f"N={last['north']:.2f}, "
+            f"E={last['east']:.2f}, "
+            f"D={last['down']:.2f}"
+        )
+
+        print(
+            f"Horizontal Return   : "
+            f"{horizontal_from_origin:.2f} m from origin"
+        )
+
+        print("----------------------------------------")
+
+        print(f"Start Battery       : {start_battery:.1f}%")
+        print(f"End Battery         : {end_battery:.1f}%")
+        print(f"Minimum Battery     : {min_battery:.1f}%")
+        print(f"Battery Used        : {battery_used:.1f}%")
+
+        print("----------------------------------------")
+
+        print(f"Last Recorded State : {last['mode']}")
+        print("Data Source         : PX4 SITL telemetry")
+        print("Coordinate Frame    : Local NED (m)")
+        print("Simulation Platform : PX4 SITL + Gazebo")
+
+        print("========================================")
+
+
+if __name__ == "__main__":
+    report = MissionReport()
+    report.generate()
+
+AVAILABLE FLIGHT CSV FILES
+-rw-r--r-- 1 harish harish   44 Jul 30 18:34 Logs/flight_data_20260730_183404.csv
+-rw-r--r-- 1 harish harish   44 Jul 30 18:39 Logs/flight_data_20260730_183836.csv
+-rw-r--r-- 1 harish harish 1.2K Jul 31 11:48 Logs/flight_data_20260731_114825.csv
+-rw-r--r-- 1 harish harish  228 Jul 31 11:54 Logs/flight_data_20260731_115354.csv
+-rw-r--r-- 1 harish harish   44 Jul 31 11:59 Logs/flight_data_20260731_115919.csv
+-rw-r--r-- 1 harish harish   44 Jul 31 12:24 Logs/flight_data_20260731_122345.csv
+-rw-r--r-- 1 harish harish   44 Jul 31 12:29 Logs/flight_data_20260731_122835.csv
+-rw-r--r-- 1 harish harish   44 Jul 31 12:35 Logs/flight_data_20260731_123458.csv
+-rw-r--r-- 1 harish harish  865 Jul 31 12:39 Logs/flight_data_20260731_123810.csv
+-rw-r--r-- 1 harish harish   44 Jul 31 12:43 Logs/flight_data_20260731_124253.csv
+-rw-r--r-- 1 harish harish  705 Jul 31 12:45 Logs/flight_data_20260731_124434.csv
+-rw-r--r-- 1 harish harish  706 Jul 31 12:53 Logs/flight_data_20260731_125213.csv
+-rw-r--r-- 1 harish harish  912 Jul 31 13:50 Logs/flight_data_20260731_134950.csv
+-rw-r--r-- 1 harish harish 1.3K Jul 31 13:54 Logs/flight_data_20260731_135331.csv
+-rw-r--r-- 1 harish harish  907 Jul 31 13:58 Logs/flight_data_20260731_135750.csv
+-rw-r--r-- 1 harish harish 1.3K Jul 31 14:31 Logs/flight_data_20260731_142944.csv
+-rw-r--r-- 1 harish harish   44 Jul 31 14:38 Logs/flight_data_20260731_143846.csv
+-rw-r--r-- 1 harish harish   44 Jul 31 14:39 Logs/flight_data_20260731_143948.csv
+-rw-r--r-- 1 harish harish  902 Aug  1 14:11 Logs/flight_data_20260801_141034.csv
+-rw-r--r-- 1 harish harish  499 Aug  1 14:13 Logs/flight_data_20260801_141233.csv
+-rw-r--r-- 1 harish harish  904 Aug  2 05:39 Logs/flight_data_20260802_053820.csv
+-rw-r--r-- 1 harish harish 1.6K Aug  2 05:43 Logs/flight_data_20260802_054238.csv
+-rw-r--r-- 1 harish harish  699 Aug  2 11:06 Logs/flight_data_20260802_110606.csv
+-rw-r--r-- 1 harish harish  444 Aug  2 11:08 Logs/flight_data_20260802_110744.csv
+-rw-r--r-- 1 harish harish  499 Aug  2 11:08 Logs/flight_data_20260802_110817.csv
+-rw-r--r-- 1 harish harish  948 Oct 30 21:46 Logs/flight_data_20261030_214523.csv
+-rw-r--r-- 1 harish harish  909 Oct 30 21:48 Logs/flight_data_20261030_214736.csv
+-rw-r--r-- 1 harish harish  750 Oct 30 23:07 Logs/flight_data_20261030_230710.csv
+-rw-r--r-- 1 harish harish 1.2K Oct 31 09:54 Logs/flight_data_20261031_095357.csv
+-rw-r--r-- 1 harish harish  997 Oct 31 10:04 Logs/flight_data_20261031_100314.csv
+-rw-r--r-- 1 harish harish 1.7K Nov  1 13:33 Logs/flight_data_20261101_133157.csv
+-rw-r--r-- 1 harish harish 1.3K Nov  1 20:49 Logs/flight_data_20261101_204809.csv

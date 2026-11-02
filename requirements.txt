@@ -1,5 +1,4 @@
-mavsdk
-asyncio
+mavsdk==3.17.2
 numpy
 opencv-python
 pymavlink

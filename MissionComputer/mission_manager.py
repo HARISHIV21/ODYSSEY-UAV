@@ -140,20 +140,22 @@ class MissionManager:
 
         await self.fm.land()
 
+        # Wait for PX4 to confirm that the vehicle is physically on ground.
+        await self.fm.wait_until_landed(timeout=60.0)
+
         # -------------------------------------------------
         # DISARM
         # -------------------------------------------------
 
         sm.set_state(MissionState.DISARM)
 
+        # PX4 may automatically disarm after detecting landing.
         try:
-
+            await self.fm.wait_until_disarmed(timeout=3.0)
+        except TimeoutError:
+            print("[MISSION] Still armed after landing; requesting disarm...")
             await self.fm.disarm()
-
-        except Exception:
-
-            # PX4 may automatically disarm after landing
-            pass
+            await self.fm.wait_until_disarmed(timeout=15.0)
 
         # -------------------------------------------------
         # COMPLETE

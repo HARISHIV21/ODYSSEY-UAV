@@ -70,9 +70,13 @@ class FailsafeManager:
 
         except Exception as e:
 
+            self.reason = "BATTERY TELEMETRY FAILURE"
+
             self.log_warning(
                 f"Battery check unavailable: {e}"
             )
+
+            return False
 
         return True
 
@@ -98,9 +102,13 @@ class FailsafeManager:
 
         except Exception as e:
 
+            self.reason = "VEHICLE HEALTH TELEMETRY FAILURE"
+
             self.log_warning(
                 f"Health check unavailable: {e}"
             )
+
+            return False
 
         return True
 
@@ -144,13 +152,8 @@ class FailsafeManager:
 
     async def execute(self):
 
-        # Prevent accidental duplicate failsafe execution
         if self.active:
-
-            print(
-                "[FAILSAFE] Failsafe already active"
-            )
-
+            print("[FAILSAFE] Failsafe already active")
             return
 
         self.active = True
@@ -159,7 +162,6 @@ class FailsafeManager:
             self.reason = "MISSION EXECUTION FAILURE"
 
         if self.logger:
-
             try:
                 self.logger.log_error(
                     f"FAILSAFE ACTIVATED - {self.reason}"
@@ -167,104 +169,64 @@ class FailsafeManager:
             except Exception:
                 pass
 
-        print("\n==============================")
+        print("\\n==============================")
         print("ODYSSEY FAILSAFE")
         print("==============================")
-
-        print(
-            f"[FAILSAFE] Reason: {self.reason}"
-        )
-
-        # -------------------------------------------------
-        # STOP OFFBOARD
-        # -------------------------------------------------
+        print(f"[FAILSAFE] Reason: {self.reason}")
 
         try:
-
-            print(
-                "[FAILSAFE] Stopping Offboard..."
-            )
-
+            print("[FAILSAFE] Stopping Offboard...")
             await self.fm.offboard.stop()
-
-            print(
-                "[FAILSAFE] Offboard stopped"
-            )
-
+            print("[FAILSAFE] Offboard stopped")
         except Exception as e:
+            print(f"[FAILSAFE] Offboard stop warning: {e}")
 
-            print(
-                f"[FAILSAFE] Offboard stop warning: {e}"
-            )
-
-        # -------------------------------------------------
-        # LAND
-        # -------------------------------------------------
-
-        landing_successful = False
+        landing_confirmed = False
+        disarm_confirmed = False
 
         try:
-
-            print(
-                "[FAILSAFE] Commanding landing..."
-            )
-
+            print("[FAILSAFE] Commanding landing...")
             await self.fm.land()
+            print("[FAILSAFE] Landing command accepted")
 
-            landing_successful = True
-
-            print(
-                "[FAILSAFE] Landing command accepted"
-            )
+            await self.fm.wait_until_landed(timeout=60.0)
+            landing_confirmed = True
+            print("[FAILSAFE] Landing confirmed")
 
         except Exception as e:
-
             self.log_error(
-                f"Landing command failed: {e}"
+                f"Landing could not be confirmed: {e}"
             )
 
-        # -------------------------------------------------
-        # DISARM
-        # -------------------------------------------------
+        if landing_confirmed:
+            try:
+                await self.fm.wait_until_disarmed(timeout=3.0)
+                disarm_confirmed = True
 
-        try:
+            except TimeoutError:
+                try:
+                    print("[FAILSAFE] Requesting disarm...")
+                    await self.fm.disarm()
+                    await self.fm.wait_until_disarmed(timeout=15.0)
+                    disarm_confirmed = True
+                except Exception as e:
+                    self.log_error(
+                        f"Disarm could not be confirmed: {e}"
+                    )
 
-            print(
-                "[FAILSAFE] Attempting disarm..."
-            )
+            except Exception as e:
+                self.log_error(
+                    f"Disarm telemetry unavailable: {e}"
+                )
 
-            await self.fm.disarm()
+        print("\\n==============================")
 
-            print(
-                "[FAILSAFE] Disarm command completed"
-            )
-
-        except Exception as e:
-
-            print(
-                f"[FAILSAFE] Disarm warning: {e}"
-            )
-
-        # -------------------------------------------------
-        # FINAL STATUS
-        # -------------------------------------------------
-
-        print("\n==============================")
-
-        if landing_successful:
-
-            print(
-                "[FAILSAFE] VEHICLE SAFE"
-            )
-
+        if landing_confirmed and disarm_confirmed:
+            print("[FAILSAFE] VEHICLE SAFE")
+        elif not landing_confirmed:
+            print("[FAILSAFE] LANDING STATUS UNKNOWN")
         else:
+            print("[FAILSAFE] LANDING CONFIRMED - DISARM UNCONFIRMED")
 
-            print(
-                "[FAILSAFE] LANDING STATUS UNKNOWN"
-            )
-
-        print(
-            f"[FAILSAFE] Reason: {self.reason}"
-        )
-
+        print(f"[FAILSAFE] Reason: {self.reason}")
         print("==============================")

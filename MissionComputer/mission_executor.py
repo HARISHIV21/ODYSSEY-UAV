@@ -29,26 +29,7 @@ class MissionExecutor:
             print(f"[EXECUTOR] ERROR : {e}")
 
             if self.mm.state_machine:
-
-                self.mm.state_machine.set_state(
-                    MissionState.FAILSAFE
-                )
-
-            try:
-
-                print("[EXECUTOR] Attempting Safe Landing...")
-
-                await self.fm.offboard.stop()
-
-            except Exception:
-                pass
-
-            try:
-
-                await self.fm.land()
-
-            except Exception:
-                pass
+                self.mm.state_machine.set_state(MissionState.FAILSAFE)
 
             raise
 

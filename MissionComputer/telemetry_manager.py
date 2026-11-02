@@ -54,6 +54,10 @@ class TelemetryManager:
 
     async def update(self):
 
+        self.position_received = False
+        self.battery_received = False
+        self.mode_received = False
+
         results = await asyncio.gather(
             self.get_position_once(),
             self.get_battery_once(),
@@ -61,15 +65,15 @@ class TelemetryManager:
             return_exceptions=True
         )
 
-        errors = []
-
         for result in results:
-
             if isinstance(result, Exception):
-                errors.append(result)
+                raise result
 
-        if errors:
-            raise errors[0]
+        if not self.position_received:
+            raise RuntimeError("No fresh position telemetry received")
+
+        if not self.battery_received:
+            raise RuntimeError("No fresh battery telemetry received")
 
     def ready(self):
 

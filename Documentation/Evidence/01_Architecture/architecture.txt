@@ -1,0 +1,194 @@
+ODYSSEY PROJECT STRUCTURE
+
+.
+├── Communication
+│   ├── arm.py
+│   ├── land.py
+│   ├── takeoff.py
+│   ├── telemetry_stream.py
+│   └── uav_connection.py
+├── Config
+│   └── config.py
+├── Control
+│   ├── controller.py
+│   └── flight_modes.py
+├── Core
+│   ├── core.py
+│   ├── failsafe.py
+│   └── logger.py
+├── Data
+│   ├── Logs
+│   ├── Maps
+│   ├── Missions
+│   │   └── mission.json
+│   └── mission.json
+├── Documentation
+│   ├── API.md
+│   ├── ARCHITECTURE.md
+│   ├── Evidence
+│   │   ├── 01_Architecture
+│   │   ├── 02_Mission
+│   │   ├── 03_Navigation
+│   │   ├── 04_Flight_Control
+│   │   ├── 05_Safety
+│   │   ├── 06_Telemetry
+│   │   ├── 07_Recording
+│   │   ├── 08_Testing
+│   │   ├── 09_SITL
+│   │   ├── 10_Analysis
+│   │   ├── ODYSSEY_EVIDENCE_REPORT.txt
+│   │   ├── SCREENSHOT_GUIDE.txt
+│   │   └── environment.txt
+│   ├── INSTALL.md
+│   └── USER_GUIDE.md
+├── Images
+│   ├── 01_gazebo_x500_mission.png
+│   ├── 02_mission_execution.png
+│   ├── 03_waypoint_navigation.png
+│   ├── 04_flight_recorder.png
+│   ├── 05_post_flight_report.png
+│   ├── 06_qgroundcontrol_offboard_flight.png
+│   └── 07_trajectory_validation.png
+├── LICENSE
+├── Logs
+│   ├── flight_data_20260730_183404.csv
+│   ├── flight_data_20260730_183836.csv
+│   ├── flight_data_20260731_114825.csv
+│   ├── flight_data_20260731_115354.csv
+│   ├── flight_data_20260731_115919.csv
+│   ├── flight_data_20260731_122345.csv
+│   ├── flight_data_20260731_122835.csv
+│   ├── flight_data_20260731_123458.csv
+│   ├── flight_data_20260731_123810.csv
+│   ├── flight_data_20260731_124253.csv
+│   ├── flight_data_20260731_124434.csv
+│   ├── flight_data_20260731_125213.csv
+│   ├── flight_data_20260731_134950.csv
+│   ├── flight_data_20260731_135331.csv
+│   ├── flight_data_20260731_135750.csv
+│   ├── flight_data_20260731_142944.csv
+│   ├── flight_data_20260731_143846.csv
+│   ├── flight_data_20260731_143948.csv
+│   ├── flight_data_20260801_141034.csv
+│   ├── flight_data_20260801_141233.csv
+│   ├── flight_data_20260802_053820.csv
+│   ├── flight_data_20260802_054238.csv
+│   ├── flight_data_20260802_110606.csv
+│   ├── flight_data_20260802_110744.csv
+│   ├── flight_data_20260802_110817.csv
+│   ├── flight_data_20261030_214523.csv
+│   ├── flight_data_20261030_214736.csv
+│   ├── flight_data_20261030_230710.csv
+│   ├── flight_data_20261031_095357.csv
+│   ├── flight_data_20261031_100314.csv
+│   ├── flight_data_20261101_133157.csv
+│   ├── flight_data_20261101_204809.csv
+│   ├── latest_mission_report.txt
+│   ├── mission_20260730_155622.log
+│   ├── mission_20260730_155748.log
+│   ├── mission_20260730_160028.log
+│   ├── mission_20260730_160442.log
+│   ├── mission_20260730_175857.log
+│   ├── mission_20260730_180429.log
+│   ├── mission_20260730_180739.log
+│   ├── mission_20260730_181356.log
+│   ├── mission_20260730_181534.log
+│   ├── mission_20260730_182741.log
+│   ├── mission_20260730_183404.log
+│   ├── mission_20260730_183836.log
+│   ├── mission_20260731_114825.log
+│   ├── mission_20260731_115354.log
+│   ├── mission_20260731_115918.log
+│   ├── mission_20260731_122345.log
+│   ├── mission_20260731_122835.log
+│   ├── mission_20260731_123458.log
+│   ├── mission_20260731_123810.log
+│   ├── mission_20260731_124253.log
+│   ├── mission_20260731_124434.log
+│   ├── mission_20260731_125213.log
+│   ├── mission_20260731_134950.log
+│   ├── mission_20260731_135331.log
+│   ├── mission_20260731_135750.log
+│   ├── mission_20260731_142944.log
+│   ├── mission_20260731_143846.log
+│   ├── mission_20260731_143948.log
+│   ├── mission_20260801_141034.log
+│   ├── mission_20260801_141233.log
+│   ├── mission_20260802_053820.log
+│   ├── mission_20260802_054238.log
+│   ├── mission_20260802_110606.log
+│   ├── mission_20260802_110744.log
+│   ├── mission_20260802_110817.log
+│   ├── mission_20261030_214523.log
+│   ├── mission_20261030_214736.log
+│   ├── mission_20261030_230710.log
+│   ├── mission_20261031_095357.log
+│   ├── mission_20261031_100314.log
+│   ├── mission_20261101_133157.log
+│   └── mission_20261101_204809.log
+├── MissionComputer
+│   ├── __init__.py
+│   ├── battery_monitor.py
+│   ├── failsafe_manager.py
+│   ├── failsafe_manager.py.bak
+│   ├── failsafe_manager.py.pre_landing_fix.bak
+│   ├── flight_manager.py
+│   ├── flight_manager.py.bak
+│   ├── flight_manager.py.bak_landing_20261031
+│   ├── flight_manager.py.pre_timeout.bak
+│   ├── flight_recorder.py
+│   ├── health_monitor.py
+│   ├── logger.py
+│   ├── mission_computer.py
+│   ├── mission_executor.py
+│   ├── mission_executor.py.pre_failsafe_ownership.bak
+│   ├── mission_manager.py
+│   ├── mission_manager.py.bak_confirmed_landing_20261031
+│   ├── mission_manager.py.bak_landing_20261031
+│   ├── mission_runner.py
+│   ├── offboard_controller.py
+│   ├── run_mission.py
+│   ├── state_machine.py
+│   ├── telemetry_manager.py
+│   └── telemetry_manager.py.pre_freshness_fix.bak
+├── Missions
+├── Navigation
+│   ├── __init__.py
+│   ├── distance.py
+│   ├── mission_loader.py
+│   ├── mission_loader.py.bak
+│   ├── mission_loader.py.pre_validator.bak
+│   ├── mission_planner.py
+│   ├── mission_validator.py
+│   ├── navigation.py
+│   ├── navigation_engine.py
+│   ├── navigation_engine.py.pre_timeout_fix.bak
+│   ├── trajectory.py
+│   └── waypoint_tracker.py
+├── ODYSSEY_PROJECT_CODE.txt
+├── README.md
+├── Scripts
+├── Sensors
+│   ├── battery.py
+│   └── imu.py
+├── Telemetry
+│   └── telemetry.py
+├── Utils
+│   ├── logger.py
+│   ├── mission_report.py
+│   └── plot_trajectory.py
+├── app.py
+├── mission_manager.py
+├── offboard_controller.py
+├── px4_sitl.log
+├── px4_sitl_pre_validation_20261031.log
+├── px4_sitl_previous_20261031.log
+├── px4_sitl_validation_20261031.log
+├── requirements.txt
+├── run_odyssey.sh
+├── state_machine.py
+├── test_mission.py
+├── test_mission.py.bak
+└── test_mission.py.bak_landing_20261031
+
+30 directories, 160 files

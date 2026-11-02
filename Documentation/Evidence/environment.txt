@@ -1,0 +1,16 @@
+Python:
+Python 3.12.3
+
+Pytest:
+pytest 9.2.0
+
+PX4-related processes:
+450 make px4_sitl gz_x500
+508 /bin/sh -c cmake --build "/home/harish/Projects/PX4-Autopilot/build/px4_sitl_default" --  gz_x500
+509 cmake --build /home/harish/Projects/PX4-Autopilot/build/px4_sitl_default -- gz_x500
+510 /usr/bin/ninja gz_x500
+3364 /bin/sh -c cd /home/harish/Projects/PX4-Autopilot/build/px4_sitl_default/src/modules/simulation/gz_bridge && /usr/bin/cmake -E env PX4_SIM_MODEL=gz_x500 GZ_IP=127.0.0.1 /home/harish/Projects/PX4-Autopilot/build/px4_sitl_default/bin/px4
+3365 /usr/bin/cmake -E env PX4_SIM_MODEL=gz_x500 GZ_IP=127.0.0.1 /home/harish/Projects/PX4-Autopilot/build/px4_sitl_default/bin/px4
+3366 /home/harish/Projects/PX4-Autopilot/build/px4_sitl_default/bin/px4
+3548 gz sim --verbose=1 -r -s /home/harish/Projects/PX4-Autopilot/Tools/simulation/gz/worlds/default.sdf
+3549 gz sim -g

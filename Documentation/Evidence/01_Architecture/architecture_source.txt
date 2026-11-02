@@ -1,0 +1,878 @@
+==================================================
+ARCHITECTURE AND CORE
+==================================================
+
+FILE: README.md
+--------------------------------------------------
+# ODYSSEY UAV
+
+### Software-Defined Autonomous UAV Navigation & Mission Computer
+
+ODYSSEY UAV is a modular autonomous flight software platform implementing mission management, waypoint navigation, offboard control, telemetry acquisition, health monitoring, failsafe handling, flight-data recording, and post-flight analysis.
+
+The system is developed and validated entirely in **Software-in-the-Loop (SITL)** using **PX4 Autopilot, Gazebo, MAVSDK-Python, and Python**, enabling autonomous UAV software development without physical flight hardware.
+
+---
+
+## System Overview
+
+ODYSSEY separates high-level mission intelligence from the underlying flight-control system.
+
+```text
+                     Mission Definition
+                           mission.json
+                               |
+                               v
+                  +-------------------------+
+                  |    Mission Computer     |
+                  |-------------------------|
+                  | Mission Executor        |
+                  | Mission Manager         |
+                  | State Machine           |
+                  | Health Monitor          |
+                  | Battery Monitor         |
+                  | Failsafe Manager        |
+                  +------------+------------+
+                               |
+                               v
+                  +-------------------------+
+                  |   Navigation Engine     |
+                  |-------------------------|
+                  | Waypoint Tracking       |
+                  | Distance Calculation    |
+                  | Arrival Detection       |
+                  +------------+------------+
+                               |
+                               v
+                  +-------------------------+
+                  |  Offboard Controller    |
+                  +------------+------------+
+                               |
+                            MAVSDK
+                               |
+                               v
+                     +------------------+
+                     |     PX4 SITL     |
+                     +--------+---------+
+                              |
+                              v
+                     +------------------+
+                     |   Gazebo x500    |
+                     +------------------+
+
+Telemetry
+    |
+    +----> Flight Recorder ----> CSV Flight Data
+    |
+    +----> Post-Flight Analysis
+```
+
+---
+
+## Core Capabilities
+
+- Autonomous mission execution
+- JSON-defined waypoint missions
+- PX4 vehicle connection through MAVSDK
+- Automated pre-flight health verification
+- Autonomous arming and takeoff
+- MAVSDK Offboard position control
+- Local NED waypoint navigation
+- Real-time waypoint arrival detection
+- Mission progress tracking
+- Mission state-machine architecture
+- Battery monitoring
+- Vehicle-health monitoring
+- Autonomous failsafe handling
+- Automated landing and disarming
+- Live telemetry acquisition
+- CSV flight-data recording
+- Post-flight mission analysis
+- Commanded-vs-actual trajectory visualization
+
+---
+
+## Autonomous Mission Demonstration
+
+The validation mission commands the simulated UAV to execute a square trajectory in the PX4 local **North-East-Down (NED)** coordinate frame.
+
+| Waypoint | North | East | Down |
+|---|---:|---:|---:|
+| WP1 | 5 m | 0 m | -10 m |
+| WP2 | 5 m | 5 m | -10 m |
+| WP3 | 0 m | 5 m | -10 m |
+| WP4 | 0 m | 0 m | -10 m |
+
+Nominal mission altitude:
+
+**10 m above the local origin**
+
+Mission sequence:
+
+```text
+INITIALIZE
+    |
+    v
+CONNECT
+    |
+    v
+WAIT_FOR_HEALTH
+    |
+    v
+ARM
+    |
+    v
+TAKEOFF
+    |
+    v
+START_OFFBOARD
+    |
+    v
+MISSION
+    |
+    v
+WAYPOINT 1 -> WAYPOINT 2 -> WAYPOINT 3 -> WAYPOINT 4
+    |
+    v
+LAND
+    |
+    v
+DISARM
+    |
+    v
+COMPLETE
+```
+
+---
+
+## Simulation Environment
+
+The complete flight stack is validated using PX4 SITL and Gazebo with the x500 multicopter model.
+
+![PX4 Gazebo x500 simulation](Images/01_gazebo_x500_mission.png)
+
+This environment provides simulated vehicle dynamics, IMU, GNSS, magnetometer, barometer, actuator behavior, and MAVLink communication for repeatable software validation.
+
+---
+
+## Mission Computer Execution
+
+ODYSSEY coordinates the complete autonomous flight sequence through a dedicated mission state machine.
+
+![ODYSSEY mission execution](Images/02_mission_execution.png)
+
+The mission computer is responsible for coordinating vehicle connection, pre-flight verification, arming, takeoff, Offboard initialization, waypoint execution, landing, and mission completion.
+
+---
+
+## Navigation Engine
+
+Waypoint navigation is handled independently from the high-level mission state machine.
+
+For each target, the navigation engine evaluates the UAV position relative to the commanded waypoint using the local NED coordinate frame.
+
+The three-dimensional position error is evaluated as:
+
+```text
+distance = sqrt(
+    north_error² +
+    east_error² +
+    down_error²
+)
+```
+
+The waypoint is considered reached when the vehicle enters the configured arrival tolerance.
+
+![ODYSSEY waypoint navigation](Images/03_waypoint_navigation.png)
+
+This provides closed-loop mission progression based on measured PX4 telemetry rather than fixed timing assumptions.
+
+---
+
+## Flight Data Recorder
+
+ODYSSEY includes a telemetry recorder for capturing mission data during autonomous operation.
+
+Recorded parameters include:
+
+```text
+Time
+North Position
+East Position
+Down Position
+Battery Percentage
+Mission State
+```
+
+![ODYSSEY flight recorder](Images/04_flight_recorder.png)
+
+Flight records are stored as CSV data and can subsequently be processed by the post-flight analysis utilities.
+
+---
+
+## Post-Flight Analysis
+
+The mission-analysis utility extracts engineering metrics from recorded PX4 telemetry.
+
+Metrics include:
+
+- recorded mission duration
+- maximum altitude
+- travelled trajectory distance
+- North/East operating range
+- final position
+- horizontal return error
+- battery consumption
+- minimum recorded battery level
+- final recorded mission state
+
+![ODYSSEY post-flight report](Images/05_post_flight_report.png)
+
+This provides repeatable quantitative evidence in addition to visual simulator validation.
+
+---
+
+## QGroundControl Validation
+
+The autonomous mission can also be observed independently through QGroundControl.
+
+![QGroundControl Offboard flight validation](Images/06_qgroundcontrol_offboard_flight.png)
+
+QGroundControl provides an independent view of vehicle state, Offboard flight mode, altitude, battery telemetry, and the executed flight path.
+
+---
+
+## Trajectory Validation
+
+ODYSSEY includes a Python analysis utility that compares the commanded square mission with the trajectory reconstructed from recorded PX4 telemetry.
+
+![ODYSSEY autonomous trajectory validation](Images/07_trajectory_validation.png)
+
+Example validation from a completed SITL mission:
+
+| Metric | Result |
+|---|---:|
+| Mission geometry | 5 m × 5 m square |
+| Commanded altitude | 10 m |
+| Waypoints commanded | 4 |
+| Final North position | 0.10 m |
+| Final East position | 0.02 m |
+| Horizontal return error | 0.10 m |
+| Environment | PX4 SITL + Gazebo |
+
+The reported values correspond to a simulation run and are not presented as physical-flight performance measurements.
+
+---
+
+## Flight Recorder and Analysis Pipeline
+
+```text
+PX4 Telemetry
+      |
+      v
+Telemetry Manager
+      |
+      v
+Flight Recorder
+      |
+      v
+flight_data_*.csv
+      |
+      +----------------------+
+      |                      |
+      v                      v
+Mission Report       Trajectory Analysis
+      |                      |
+      v                      v
+Engineering Metrics   Validation Figure
+```
+
+---
+
+## Failsafe Architecture
+
+The mission computer includes a dedicated failsafe manager.
+
+Monitored conditions include:
+
+- vehicle-health status
+- battery condition
+- mission execution exceptions
+
+When a critical mission exception occurs, ODYSSEY attempts to transition the vehicle to a safe condition by:
+
+```text
+Mission Failure
+      |
+      v
+FAILSAFE
+      |
+      v
+Stop Offboard Control
+      |
+      v
+Command Landing
+      |
+      v
+Disarm when appropriate
+```
+
+The architecture keeps failsafe handling separate from normal mission execution.
+
+---
+
+## Repository Structure
+
+```text
+ODYSSEY-UAV/
+|
+├── MissionComputer/
+│   ├── mission_computer.py
+│   ├── mission_manager.py
+│   ├── mission_executor.py
+│   ├── flight_manager.py
+│   ├── offboard_controller.py
+│   ├── telemetry_manager.py
+│   ├── health_monitor.py
+│   ├── battery_monitor.py
+│   ├── failsafe_manager.py
+│   ├── flight_recorder.py
+│   └── state_machine.py
+|
+├── Navigation/
+│   ├── navigation_engine.py
+│   ├── waypoint_tracker.py
+│   ├── distance.py
+│   ├── mission_loader.py
+│   └── mission_planner.py
+|
+├── Utils/
+│   ├── mission_report.py
+│   └── plot_trajectory.py
+|
+├── Data/
+│   └── mission.json
+|
+├── Documentation/
+│   ├── ARCHITECTURE.md
+│   ├── INSTALL.md
+│   ├── USER_GUIDE.md
+│   └── API.md
+|
+├── Images/
+│   └── validation figures
+|
+├── Logs/
+│   └── .gitkeep
+|
+├── app.py
+├── requirements.txt
+├── README.md
+├── LICENSE
+└── .gitignore
+```
+
+---
+
+## Technology Stack
+
+| Technology | Role |
+|---|---|
+| Python | Mission-computer software |
+| MAVSDK-Python | PX4 command and telemetry interface |
+| PX4 Autopilot | Flight-control stack |
+| Gazebo | UAV physics simulation |
+| MAVLink | Vehicle communication |
+| QGroundControl | Independent vehicle monitoring |
+| Matplotlib | Flight trajectory visualization |
+| Git / GitHub | Version control and project documentation |
+
+---
+
+## Mission Definition
+
+Mission geometry is separated from the mission-control implementation.
+
+Example:
+
+```json
+{
+    "mission_name": "Square Flight",
+    "takeoff_altitude": 10,
+    "waypoints": [
+        {
+            "north": 5,
+            "east": 0,
+            "down": -10,
+            "yaw": 0
+        },
+        {
+            "north": 5,
+            "east": 5,
+            "down": -10,
+            "yaw": 90
+        },
+        {
+            "north": 0,
+            "east": 5,
+            "down": -10,
+            "yaw": 180
+        },
+        {
+            "north": 0,
+            "east": 0,
+            "down": -10,
+            "yaw": 270
+        }
+    ]
+}
+```
+
+This allows mission trajectories to be changed without modifying the core mission-computer logic.
+
+---
+
+## Running the Simulation
+
+### 1. Start PX4 SITL with Gazebo
+
+From the PX4 Autopilot directory:
+
+```bash
+make px4_sitl gz_x500
+```
+
+Wait until PX4 completes initialization and the vehicle passes its required pre-flight checks.
+
+### 2. Activate the ODYSSEY environment
+
+From the project directory:
+
+```bash
+source venv/bin/activate
+```
+
+### 3. Execute the autonomous mission
+
+```bash
+python app.py
+```
+
+### 4. Generate the post-flight report
+
+```bash
+python Utils/mission_report.py
+```
+
+### 5. Generate trajectory validation
+
+```bash
+python Utils/plot_trajectory.py
+```
+
+The generated trajectory figure is stored in:
+
+```text
+Images/07_trajectory_validation.png
+```
+
+---
+
+## Engineering Design Principles
+
+ODYSSEY was structured around several software-engineering principles relevant to autonomous and embedded systems:
+
+**Modularity** — mission execution, navigation, telemetry, safety monitoring, and analysis are separated into dedicated modules.
+
+**State-based execution** — mission progression is represented explicitly through mission states rather than a single procedural flight script.
+
+**Telemetry-driven navigation** — waypoint completion depends on measured vehicle position.
+
+**Safety separation** — failsafe handling is isolated from nominal mission execution.
+
+**Configuration-driven missions** — waypoint definitions are stored separately from navigation logic.
+
+**Post-flight verification** — recorded telemetry is used to quantitatively evaluate mission execution.
+
+---
+
+## Validation Scope
+
+ODYSSEY is currently a **software-only autonomous UAV project**.
+
+Validation has been performed using:
+
+- PX4 Software-in-the-Loop
+- Gazebo x500 multicopter simulation
+- MAVSDK Offboard control
+- QGroundControl monitoring
+- recorded PX4 telemetry
+- post-flight trajectory analysis
+
+The current results therefore demonstrate **SITL software validation**, not hardware-in-the-loop or physical UAV flight testing.
+
+---
+
+## Future Development
+
+Potential extensions include:
+
+- dynamic waypoint replanning
+- obstacle avoidance
+- GNSS-denied navigation
+- visual-inertial odometry
+- computer-vision perception
+- geofencing
+- mission abort/recovery strategies
+- redundant state estimation
+- ROS 2 integration
+- Hardware-in-the-Loop validation
+- deployment to an embedded companion computer
+
+---
+
+## Documentation
+
+Additional engineering documentation is available under:
+
+```text
+Documentation/
+├── ARCHITECTURE.md
+├── INSTALL.md
+├── USER_GUIDE.md
+└── API.md
+```
+
+---
+
+## Project Status
+
+**Autonomous mission pipeline:** Implemented
+**Waypoint navigation:** Implemented
+**PX4 Offboard control:** Implemented
+**Telemetry recording:** Implemented
+**Health monitoring:** Implemented
+**Failsafe management:** Implemented
+**Post-flight analysis:** Implemented
+**SITL validation:** Completed
+**Physical flight validation:** Not performed
+
+---
+
+## License
+
+See the repository `LICENSE` file for licensing information.
+
+---
+
+### ODYSSEY UAV
+
+**Autonomous Navigation • Mission Computing • PX4 • MAVSDK • Software-in-the-Loop**
+
+FILE: MissionComputer/mission_computer.py
+--------------------------------------------------
+import asyncio
+import time
+
+from MissionComputer.state_machine import StateMachine
+from MissionComputer.mission_manager import MissionManager
+from MissionComputer.mission_executor import MissionExecutor
+from MissionComputer.battery_monitor import BatteryMonitor
+from MissionComputer.health_monitor import HealthMonitor
+from MissionComputer.failsafe_manager import FailsafeManager
+from MissionComputer.logger import MissionLogger
+from MissionComputer.flight_recorder import FlightRecorder
+
+
+class MissionComputer:
+
+    def __init__(self, flight_manager, mission):
+
+        self.flight_manager = flight_manager
+        self.mission = mission
+
+        # Logging
+        self.logger = MissionLogger()
+        self.recorder = FlightRecorder()
+
+        # State machine
+        self.state_machine = StateMachine()
+
+        # Vehicle monitoring
+        self.battery = BatteryMonitor(
+            flight_manager.drone
+        )
+
+        self.health = HealthMonitor(
+            flight_manager.drone
+        )
+
+        # Mission manager
+        self.mission_manager = MissionManager(
+            flight_manager,
+            mission
+        )
+
+        self.mission_manager.attach_state_machine(
+            self.state_machine
+        )
+
+        # Mission executor
+        self.executor = MissionExecutor(
+            flight_manager,
+            self.mission_manager
+        )
+
+        # Failsafe
+        self.failsafe = FailsafeManager(
+            flight_manager,
+            self.battery,
+            self.health,
+            self.logger
+        )
+
+        # Flight recorder control
+        self.recording = False
+        self.recording_task = None
+
+    async def flight_recording_loop(self):
+
+        start_time = time.monotonic()
+
+        print("[RECORDER] Waiting for telemetry...")
+
+        # -------------------------------------------------
+        # WAIT FOR MAVSDK TELEMETRY
+        # -------------------------------------------------
+
+        while self.recording:
+
+            try:
+
+                await self.flight_manager.telemetry.update()
+
+                if self.flight_manager.telemetry.ready():
+                    break
+
+            except asyncio.CancelledError:
+
+                return
+
+            except Exception:
+
+                # PX4 may still be completing connection
+                await asyncio.sleep(0.5)
+
+        if not self.recording:
+            return
+
+        print("[RECORDER] Live recording started")
+
+        # -------------------------------------------------
+        # RECORD FLIGHT DATA
+        # -------------------------------------------------
+
+        while self.recording:
+
+            try:
+
+                await self.flight_manager.telemetry.update()
+
+                snapshot = (
+                    self.flight_manager.telemetry.get_snapshot()
+                )
+
+                elapsed_time = (
+                    time.monotonic() - start_time
+                )
+
+                try:
+
+                    state = self.state_machine.get_state()
+
+                    state_name = str(state)
+
+                except Exception:
+
+                    state_name = snapshot["flight_mode"]
+
+                self.recorder.record(
+                    elapsed_time,
+                    snapshot["north"],
+                    snapshot["east"],
+                    snapshot["down"],
+                    snapshot["battery"],
+                    state_name
+                )
+
+            except asyncio.CancelledError:
+
+                break
+
+            except Exception as e:
+
+                print(
+                    f"[RECORDER] Telemetry warning: {e}"
+                )
+
+            await asyncio.sleep(1)
+
+        print("[RECORDER] Live recording stopped")
+
+    async def start(self):
+
+        self.logger.mission_started()
+
+        # Start recorder background task
+        self.recording = True
+
+        self.recording_task = asyncio.create_task(
+            self.flight_recording_loop()
+        )
+
+        try:
+
+            await self.executor.execute()
+
+            self.logger.mission_completed()
+
+        except Exception as e:
+
+            self.logger.log_error(str(e))
+
+            await self.failsafe.execute()
+
+            raise
+
+        finally:
+
+            # Stop recorder
+            self.recording = False
+
+            if self.recording_task:
+
+                self.recording_task.cancel()
+
+                try:
+
+                    await self.recording_task
+
+                except asyncio.CancelledError:
+
+                    pass
+
+            self.recorder.close()
+
+    async def health_report(self):
+
+        await self.health.print_health()
+
+    async def battery_report(self):
+
+        await self.battery.print_status()
+
+    def current_state(self):
+
+        return self.state_machine.get_state()
+
+    def log(self, message):
+
+        self.logger.log(message)
+
+FILE: MissionComputer/mission_executor.py
+--------------------------------------------------
+import asyncio
+from MissionComputer.state_machine import MissionState
+
+
+class MissionExecutor:
+
+    def __init__(self, flight_manager, mission_manager):
+
+        self.fm = flight_manager
+        self.mm = mission_manager
+
+    async def execute(self):
+
+        print("\n==============================")
+        print("MISSION EXECUTOR")
+        print("==============================")
+
+        try:
+
+            await self.mm.run()
+
+        except asyncio.CancelledError:
+
+            print("[EXECUTOR] Mission Cancelled")
+            raise
+
+        except Exception as e:
+
+            print(f"[EXECUTOR] ERROR : {e}")
+
+            if self.mm.state_machine:
+                self.mm.state_machine.set_state(MissionState.FAILSAFE)
+
+            raise
+
+        finally:
+
+            print("\n==============================")
+            print("EXECUTOR FINISHED")
+            print("==============================")
+
+FILE: MissionComputer/state_machine.py
+--------------------------------------------------
+from enum import Enum, auto
+
+
+class MissionState(Enum):
+    INITIALIZE = auto()
+    CONNECT = auto()
+    WAIT_FOR_HEALTH = auto()
+    ARM = auto()
+    TAKEOFF = auto()
+    START_OFFBOARD = auto()
+    MISSION = auto()
+    WAYPOINT = auto()
+    RETURN_HOME = auto()
+    LAND = auto()
+    DISARM = auto()
+    COMPLETE = auto()
+    FAILSAFE = auto()
+    ABORT = auto()
+
+
+class StateMachine:
+
+    def __init__(self):
+        self.state = MissionState.INITIALIZE
+
+    def set_state(self, new_state: MissionState):
+
+        old = self.state
+        self.state = new_state
+
+        print(
+            f"[STATE] {old.name}  --->  {new_state.name}"
+        )
+
+    def get_state(self):
+
+        return self.state
+
+    def is_complete(self):
+
+        return self.state == MissionState.COMPLETE
+
+    def is_failed(self):
+
+        return self.state in (
+            MissionState.FAILSAFE,
+            MissionState.ABORT,
+        )
+
+    def reset(self):
+
+        self.state = MissionState.INITIALIZE

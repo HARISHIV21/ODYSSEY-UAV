@@ -1,0 +1,50 @@
+ODYSSEY — REQUIRED VISUAL EVIDENCE
+
+01 Architecture:
+- Project structure
+- MissionComputer modules
+- Navigation and Communication modules
+
+02 Mission:
+- JSON mission file
+- Mission validation code
+
+03 Navigation:
+- Navigation engine
+- Waypoint arrival output
+
+04 Flight Control:
+- PX4 connection
+- Offboard control
+- Arming and takeoff
+
+05 Safety:
+- Landing confirmation
+- Disarming confirmation
+- Failsafe code
+- Actual terminal confirmation
+
+06 Telemetry:
+- Position, battery and flight-mode telemetry
+- Health monitoring implementation
+
+07 Recording:
+- Flight recorder
+- Actual CSV
+- Post-flight report
+
+08 Testing:
+- pytest verbose output
+- Final 37 passed summary (only if current run confirms it)
+
+09 SITL:
+- Gazebo simulation
+- QGroundControl
+- Complete mission terminal execution
+
+10 Analysis:
+- Actual trajectory plot
+- Post-flight metrics
+
+Use genuine screenshots from your own execution.
+Do not use illustrative images as project evidence.

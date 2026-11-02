@@ -1,4 +1,7 @@
+import asyncio
+
 from mavsdk import System
+from mavsdk.telemetry import LandedState
 
 from MissionComputer.offboard_controller import OffboardController
 from MissionComputer.telemetry_manager import TelemetryManager
@@ -13,8 +16,25 @@ class FlightManager:
         self.offboard = OffboardController(self.drone)
 
         self.telemetry = TelemetryManager(self.drone)
+        self._connected = False
+        self.connection_timeout = 15.0
+
+    async def _wait_until_connected(self):
+
+        async for state in self.drone.core.connection_state():
+
+            if state.is_connected:
+                return
+
+        raise RuntimeError(
+            "PX4 connection state stream ended before connection."
+        )
 
     async def connect(self):
+
+        if self._connected:
+            print("[MISSION] Already connected to PX4")
+            return
 
         print("[MISSION] Connecting to PX4...")
 
@@ -22,12 +42,24 @@ class FlightManager:
             system_address="udpin://0.0.0.0:14540"
         )
 
-        async for state in self.drone.core.connection_state():
+        try:
+            await asyncio.wait_for(
+                self._wait_until_connected(),
+                timeout=self.connection_timeout
+            )
 
-            if state.is_connected:
+        except asyncio.TimeoutError as exc:
+            self._connected = False
+            raise TimeoutError(
+                f"PX4 connection timed out after {self.connection_timeout} seconds."
+            ) from exc
 
-                print("[MISSION] Connected")
-                break
+        except Exception:
+            self._connected = False
+            raise
+
+        self._connected = True
+        print("[MISSION] Connected")
 
     async def wait_until_ready(self):
 
@@ -44,6 +76,74 @@ class FlightManager:
                 print("[MISSION] Vehicle Ready")
                 return
 
+    async def wait_until_landed(self, timeout=60.0):
+
+        if timeout <= 0:
+            raise ValueError("Landing timeout must be greater than zero.")
+
+        print("[MISSION] Waiting for confirmed landing...")
+
+        async def monitor_landing():
+
+            async for state in self.drone.telemetry.landed_state():
+
+                print(f"[MISSION] Landing state: {state.name}")
+
+                if state == LandedState.ON_GROUND:
+                    return True
+
+            raise RuntimeError(
+                "PX4 landed-state telemetry stream ended before landing confirmation."
+            )
+
+        try:
+            result = await asyncio.wait_for(
+                monitor_landing(),
+                timeout=timeout
+            )
+
+        except asyncio.TimeoutError as exc:
+            raise TimeoutError(
+                f"landing confirmation not received within {timeout} seconds."
+            ) from exc
+
+        print("[MISSION] Landing confirmed: ON_GROUND")
+        return result
+
+    async def wait_until_disarmed(self, timeout=15.0):
+
+        if timeout <= 0:
+            raise ValueError("Disarm timeout must be greater than zero.")
+
+        print("[MISSION] Waiting for confirmed disarm...")
+
+        async def monitor_disarm():
+
+            async for is_armed in self.drone.telemetry.armed():
+
+                print(f"[MISSION] Armed state: {is_armed}")
+
+                if not is_armed:
+                    return True
+
+            raise RuntimeError(
+                "PX4 armed-state telemetry stream ended before disarm confirmation."
+            )
+
+        try:
+            result = await asyncio.wait_for(
+                monitor_disarm(),
+                timeout=timeout
+            )
+
+        except asyncio.TimeoutError as exc:
+            raise TimeoutError(
+                f"disarm confirmation not received within {timeout} seconds."
+            ) from exc
+
+        print("[MISSION] Disarm confirmed")
+        return result
+
     async def arm(self):
 
         print("[MISSION] Arming...")
@@ -56,13 +156,9 @@ class FlightManager:
 
         print("[MISSION] Disarming...")
 
-        try:
+        await self.drone.action.disarm()
 
-            await self.drone.action.disarm()
-
-        except Exception:
-
-            pass
+        print("[MISSION] Disarmed")
 
     async def takeoff(self, altitude):
 

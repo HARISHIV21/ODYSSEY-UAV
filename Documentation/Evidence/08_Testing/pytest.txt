@@ -1,0 +1,45 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.2.0, pluggy-1.7.0 -- /home/harish/UAV_Project/venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/harish/UAV_Project
+collecting ... collected 37 items
+
+test_mission.py::test_mission_loads_successfully PASSED                  [  2%]
+test_mission.py::test_waypoints_use_ned_coordinates PASSED               [  5%]
+test_mission.py::test_all_waypoints_have_valid_ned_fields PASSED         [  8%]
+test_mission.py::test_missing_mission_file_raises_error PASSED           [ 10%]
+test_mission.py::test_missing_waypoint_coordinate_is_rejected PASSED     [ 13%]
+test_mission.py::test_invalid_takeoff_altitude_is_rejected PASSED        [ 16%]
+test_mission.py::test_empty_waypoint_list_is_rejected PASSED             [ 18%]
+test_mission.py::test_non_numeric_coordinate_is_rejected PASSED          [ 21%]
+test_mission.py::test_non_finite_coordinate_is_rejected PASSED           [ 24%]
+test_mission.py::test_px4_connection_is_not_repeated PASSED              [ 27%]
+test_mission.py::test_px4_connection_failure_is_reported PASSED          [ 29%]
+test_mission.py::test_px4_connection_timeout_is_reported PASSED          [ 32%]
+test_mission.py::test_wait_until_landed_accepts_on_ground PASSED         [ 35%]
+test_mission.py::test_wait_until_landed_waits_through_airborne_state PASSED [ 37%]
+test_mission.py::test_wait_until_landed_times_out PASSED                 [ 40%]
+test_mission.py::test_wait_until_landed_rejects_ended_stream PASSED      [ 43%]
+test_mission.py::test_disarm_errors_are_not_silently_ignored PASSED      [ 45%]
+test_mission.py::test_wait_until_disarmed_accepts_disarmed_state PASSED  [ 48%]
+test_mission.py::test_wait_until_disarmed_waits_for_armed_state_to_clear PASSED [ 51%]
+test_mission.py::test_wait_until_disarmed_times_out PASSED               [ 54%]
+test_mission.py::test_wait_until_disarmed_rejects_ended_stream PASSED    [ 56%]
+test_mission.py::test_wait_until_disarmed_rejects_invalid_timeout PASSED [ 59%]
+test_mission.py::test_mission_completes_only_after_landing_and_disarming PASSED [ 62%]
+test_mission.py::test_mission_does_not_complete_if_landing_fails PASSED  [ 64%]
+test_mission.py::test_mission_does_not_complete_if_disarming_fails PASSED [ 67%]
+test_mission.py::test_failsafe_rejects_unavailable_battery_telemetry PASSED [ 70%]
+test_mission.py::test_failsafe_rejects_unavailable_health_telemetry PASSED [ 72%]
+test_mission.py::test_failsafe_confirms_landing_before_disarming PASSED  [ 75%]
+test_mission.py::test_failsafe_never_disarms_if_landing_is_unconfirmed PASSED [ 78%]
+test_mission.py::test_failsafe_does_not_report_safe_if_disarming_fails PASSED [ 81%]
+test_mission.py::test_executor_propagates_failure_without_duplicate_landing PASSED [ 83%]
+test_mission.py::test_executor_propagates_cancellation_without_failsafe PASSED [ 86%]
+test_mission.py::test_navigation_confirms_waypoint_arrival PASSED        [ 89%]
+test_mission.py::test_navigation_fails_if_telemetry_stream_ends PASSED   [ 91%]
+test_mission.py::test_navigation_rejects_invalid_timeout PASSED          [ 94%]
+test_mission.py::test_telemetry_update_rejects_empty_position_stream PASSED [ 97%]
+test_mission.py::test_telemetry_update_rejects_empty_battery_stream PASSED [100%]
+
+============================== 37 passed in 0.95s ==============================
